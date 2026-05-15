@@ -1,20 +1,56 @@
 # Discord Finance Bot
 
-A scheduled Discord bot that delivers pre-market and post-market financial reports.
+A scheduled GitHub Actions-driven finance report bot that posts a rich Discord **embed** twice per trading day (pre-market + post-market) and can also be run locally for testing.
 
-## Setup
+It fetches market/crypto/news/political/contract data, asks Claude to write a plain-English briefing, parses a small "Tickers to Watch" section, and sends everything to Discord.
 
-Add `DISCORD_WEBHOOK_URL` as a GitHub Actions secret in your repository settings.
+## What it posts (Discord embed)
+
+Each run posts an embed containing:
+
+- 🇺🇸 **Equities**: SPY / QQQ / DIA / VIX snapshot
+- ₿ **Crypto**: BTC / ETH / SOL + notable movers
+- 📰 **Top Headlines**: Finnhub + RSS sources
+- 🏛️ **Political Trades**: CapitolTrades scrape (best-effort)
+- 📋 **Gov Contracts**: USASpending.gov awards (best-effort)
+- 📅 **Upcoming Earnings**: Finnhub earnings calendar (filtered)
+- 🎯 **Tickers to Watch**: parsed from Claude response
+
+All timestamps are labeled **ET** (Eastern Time). The report always includes a disclaimer.
+
+## How it runs (GitHub Actions)
+
+Workflow: `.github/workflows/report.yml`
+
+Triggers:
+- **schedule**: 8:45 AM ET and 4:15 PM ET (Mon–Fri)
+- **workflow_dispatch**: manual runs from the Actions tab
+
+The workflow installs dependencies from `requirements.txt` and caches pip (`~/.cache/pip`) between runs.
+
+## Required GitHub Secrets
+
+Configure these in repo settings → Actions → Secrets:
+
+- `DISCORD_WEBHOOK_URL` (required)
+- `ANTHROPIC_API_KEY` (for Claude analysis)
+- `FINNHUB_API_KEY` (news + earnings calendar)
+- `DISCORD_BOT_TOKEN` (for fetching prior reports/history)
+- `DISCORD_CHANNEL_ID` (for fetching prior reports/history)
+
+Secrets are only read via environment variables (never hardcoded).
 
 ## Local testing (no key leaks)
 
-1) Install deps:
+Local runs use a gitignored `.env.local` file in the repo root.
+
+### 1) Install deps
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-2) Create a repo-root `.env.local` file (this is gitignored) and put keys there:
+### 2) Create `.env.local` (repo root; gitignored)
 
 ```env
 DISCORD_WEBHOOK_URL=...
@@ -24,20 +60,47 @@ DISCORD_BOT_TOKEN=...
 DISCORD_CHANNEL_ID=...
 ```
 
-3) Run in dry-run mode (builds the embed but does not post to Discord):
+### 3) Run in DRY_RUN mode (recommended)
 
-```bash
-set DRY_RUN=1
-python bot/report.py
+DRY_RUN runs the full pipeline (fetches data, calls Claude, builds the embed) **but does not post to Discord**.
+
+PowerShell:
+```powershell
+$env:DRY_RUN="1"
+python bot\report.py
 ```
 
-Remove `DRY_RUN` to actually send to your webhook.
+CMD:
+```bat
+set DRY_RUN=1
+python bot\report.py
+```
 
-## Phases
+### Local output files
 
-- Phase 1 (current): Pipeline skeleton - Discord webhook delivery via GitHub Actions
-- Phase 2: Market data (yfinance + Alpaca)
-- Phase 3: News aggregation (Finnhub + RSS)
-- Phase 4: Crypto data (CoinGecko + Binance)
-- Phase 5: Politician trade disclosures (Capitol Trades)
-- Phase 6: Polish, caching, error handling
+When `DRY_RUN=1` is set, the run writes:
+
+- `local-output/latest_report.md` — a Discord-style embed preview
+- `local-output/latest_claude_response.md` — the full Claude response text (useful for debugging parsing)
+
+`local-output/` is gitignored.
+
+### Optional debug flags
+
+- `PARSER_DEBUG=1` — prints extra info about how the "Tickers to Watch" section was found/parsed.
+
+## Data sources (current)
+
+- Equities: `yfinance`
+- Crypto: CoinGecko API
+- News: Finnhub general news + RSS feeds
+- Political trades: CapitolTrades (HTML scrape; best-effort)
+- Gov contracts: USASpending.gov (best-effort)
+- Earnings: Finnhub earnings calendar endpoint
+- Analysis: Anthropic Claude (model `claude-sonnet-4-6`)
+
+## Notes / Design principles
+
+- Degrades gracefully: a single API outage should not crash the whole report.
+- Verbose logs: everything prints to stdout for easy debugging in Actions logs.
+- Discord limits: embed payload is clamped to Discord size limits to avoid webhook 400s.
