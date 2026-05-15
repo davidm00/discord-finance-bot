@@ -18,6 +18,21 @@ Each run posts an embed containing:
 
 All timestamps are labeled **ET** (Eastern Time). The report always includes a disclaimer.
 
+## Weekly Summary Report
+
+Every Saturday at 9:00 AM ET, the bot posts a weekly wrap-up including:
+
+- Weekly performance for SPY, QQQ, DIA, VIX, BTC, ETH, SOL
+  (Monday open → Friday close with weekly high/low)
+- Plain-English narrative of the week's dominant themes and catalysts
+- Biggest story of the week
+- Political trades and government contracts summary
+- Bot Scorecard: how this week's BUY/SELL/HOLD/WATCH calls performed
+- Week Ahead: 3-5 things to watch next week
+- Next Week Watchlist: fresh ticker calls based on weekly data
+
+The weekly report reads all daily reports posted that week via Discord history to build continuity and score previous calls.
+
 ## How it runs (GitHub Actions)
 
 Workflow: `.github/workflows/report.yml`

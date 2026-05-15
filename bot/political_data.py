@@ -115,10 +115,10 @@ def _human_money(amount: float) -> str:
     return f"${amount:,.0f}"
 
 
-def fetch_congressional_trades() -> list[dict[str, Any]]:
+def fetch_congressional_trades(lookback_days: int = 7) -> list[dict[str, Any]]:
     """Scrape recent trades from Capitol Trades.
 
-    Returns up to 15 most recent trades (>= $25K minimum amount, last 7 days).
+    Returns up to 15 most recent trades (>= $25K minimum amount, last N days).
     On failure, returns empty list.
     """
 
@@ -166,7 +166,7 @@ def fetch_congressional_trades() -> list[dict[str, Any]]:
         print("WARNING: Trades table empty.", file=sys.stderr)
         return []
 
-    cutoff = (_now_et().date() - timedelta(days=7))
+    cutoff = (_now_et().date() - timedelta(days=int(lookback_days or 7)))
 
     trades: list[dict[str, Any]] = []
 
@@ -542,7 +542,7 @@ def find_correlations(trades: list[dict[str, Any]], contracts: list[dict[str, An
     return correlations
 
 
-def fetch_political_data() -> dict[str, Any]:
+def fetch_political_data(lookback_days: int = 7) -> dict[str, Any]:
     """Fetch trades + contracts + correlations. Never raises."""
 
     fetched_at_et = _fmt_et(_now_et())
@@ -552,7 +552,7 @@ def fetch_political_data() -> dict[str, Any]:
     correlations = []
 
     try:
-        trades = fetch_congressional_trades()
+        trades = fetch_congressional_trades(lookback_days=lookback_days)
     except Exception as exc:
         print(f"WARNING: Trades fetch failed: {exc}", file=sys.stderr)
         trades = []

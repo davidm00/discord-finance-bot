@@ -7,15 +7,30 @@ on:
   schedule:
     # GitHub Actions cron uses UTC (no true timezone/DST support).
     # To handle both EDT and EST automatically, we schedule BOTH possible UTC times.
-    # A guard step inside the workflow ensures only the correct season (EDT vs EST) continues.
+    # A guard step inside each job ensures only the correct season (EDT vs EST) continues.
+
     # Pre-market: 8:45 AM ET -> 12:45 UTC (EDT) or 13:45 UTC (EST)
     - cron: '45 12 * * 1-5'
     - cron: '45 13 * * 1-5'
+
     # Post-market: 4:15 PM ET -> 20:15 UTC (EDT) or 21:15 UTC (EST)
     - cron: '15 20 * * 1-5'
     - cron: '15 21 * * 1-5'
+
+    # Weekly: Saturday 9:00 AM ET -> 13:00 UTC (EDT) or 14:00 UTC (EST)
+    - cron: '0 13 * * 6'
+    - cron: '0 14 * * 6'
+
   workflow_dispatch:
     inputs:
+      report_kind:
+        description: "Which report to run"
+        required: false
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
       dry_run:
         description: "If true, run the pipeline but do not send to Discord"
         required: false
@@ -23,6 +38,15 @@ on:
 
 jobs:
   report:
+    if: ${{
+      (github.event_name == 'schedule' && (
+        github.event.schedule == '45 12 * * 1-5' ||
+        github.event.schedule == '45 13 * * 1-5' ||
+        github.event.schedule == '15 20 * * 1-5' ||
+        github.event.schedule == '15 21 * * 1-5'
+      )) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.report_kind == '' || github.event.inputs.report_kind == 'daily'))
+    }}
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "===== Schedule guard ====="
+          echo "===== Schedule guard (daily) ====="
           echo "Event: $GITHUB_EVENT_NAME"
           echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
@@ -46,7 +70,6 @@ jobs:
           cron=$(python3 -c "import json,os;print((json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8')) or {}).get('schedule',''))")
           echo "Triggered cron: $cron"
 
-          # Determine ET offset without extra deps (EDT=-4, EST=-5)
           z=$(TZ=America/New_York date +%z)
           case "$z" in
             "-0400") offset=-4 ;;
@@ -55,7 +78,6 @@ jobs:
           esac
           echo "ET UTC offset hours: $offset ($z)"
 
-          # Map cron -> expected offset
           expected=""
           case "$cron" in
             "45 12 * * 1-5") expected=-4 ;;
@@ -78,7 +100,8 @@ jobs:
             echo "Offset mismatch; skipping run." >&2
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "=========================="
+
+          echo "==============================="
 
       - name: Checkout
         if: steps.guard.outputs.should_run == 'true'
@@ -149,5 +172,114 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
-          # Allows safe manual testing without posting
+          DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+
+  weekly-report:
+    if: ${{
+      (github.event_name == 'schedule' && (
+        github.event.schedule == '0 13 * * 6' ||
+        github.event.schedule == '0 14 * * 6'
+      )) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.report_kind == 'weekly')
+    }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Schedule guard (EDT/EST)
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== Schedule guard (weekly) ====="
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
+            echo "Non-schedule event; allowing run."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cron=$(python3 -c "import json,os;print((json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8')) or {}).get('schedule',''))")
+          echo "Triggered cron: $cron"
+
+          z=$(TZ=America/New_York date +%z)
+          case "$z" in
+            "-0400") offset=-4 ;;
+            "-0500") offset=-5 ;;
+            *) offset=0 ;;
+          esac
+          echo "ET UTC offset hours: $offset ($z)"
+
+          expected=""
+          case "$cron" in
+            "0 13 * * 6") expected=-4 ;;
+            "0 14 * * 6") expected=-5 ;;
+            *) expected="" ;;
+          esac
+
+          if [ -z "$expected" ]; then
+            echo "Unknown cron; allowing run (fail-open)."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$offset" = "$expected" ]; then
+            echo "Offset matches expected; allowing run."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Offset mismatch; skipping run." >&2
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "==============================="
+
+      - name: Checkout
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[START] Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          python -m pip install --upgrade pip --disable-pip-version-check
+          pip install --disable-pip-version-check -r requirements.txt
+          echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+
+      - name: Run weekly report
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[START] Running weekly report: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          if python bot/weekly_report.py; then
+            echo "[OK]    Weekly report succeeded: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          else
+            code=$?
+            echo "[FAIL]  Weekly report failed (exit=$code): $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')" >&2
+            exit $code
+          fi
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
