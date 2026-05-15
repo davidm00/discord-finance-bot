@@ -152,9 +152,109 @@ def _write_local_full_analysis(analysis: str) -> str | None:
     except Exception as exc:
         print(f"[report] WARNING: failed to write full analysis: {exc}")
         return None
-    except Exception as exc:
-        print(f"[report] WARNING: failed to write local preview markdown: {exc}")
-        return None
+
+
+# Discord embed constraints (most common failure cause for webhook 400s)
+DISCORD_EMBED_TOTAL_MAX = 6000
+DISCORD_TITLE_MAX = 256
+DISCORD_DESCRIPTION_MAX = 4096
+DISCORD_FIELD_NAME_MAX = 256
+DISCORD_FIELD_VALUE_MAX = 1024
+DISCORD_FOOTER_TEXT_MAX = 2048
+
+
+def _clamp_text(s: str, limit: int, ellipsis: str = "…") -> str:
+    s = str(s or "")
+    if len(s) <= limit:
+        return s
+    if limit <= len(ellipsis):
+        return s[:limit]
+    return s[: limit - len(ellipsis)].rstrip() + ellipsis
+
+
+def _embed_char_count(embed: dict) -> int:
+    title = str(embed.get("title") or "")
+    desc = str(embed.get("description") or "")
+    footer = embed.get("footer") or {}
+    footer_text = str((footer or {}).get("text") or "")
+
+    total = len(title) + len(desc) + len(footer_text)
+
+    for f in (embed.get("fields") or []):
+        total += len(str((f or {}).get("name") or ""))
+        total += len(str((f or {}).get("value") or ""))
+
+    return total
+
+
+def _sanitize_embed(embed: dict) -> dict:
+    # Clamp individual parts
+    embed["title"] = _clamp_text(embed.get("title") or "", DISCORD_TITLE_MAX)
+    embed["description"] = _clamp_text(embed.get("description") or "", DISCORD_DESCRIPTION_MAX)
+
+    footer = embed.get("footer") or {}
+    footer_text = _clamp_text((footer or {}).get("text") or "", DISCORD_FOOTER_TEXT_MAX)
+    embed["footer"] = {"text": footer_text} if footer_text else {}
+
+    fields_out = []
+    for f in (embed.get("fields") or [])[:25]:
+        name = _clamp_text((f or {}).get("name") or "", DISCORD_FIELD_NAME_MAX)
+        value = _clamp_text((f or {}).get("value") or "", DISCORD_FIELD_VALUE_MAX)
+        inline = bool((f or {}).get("inline"))
+        fields_out.append({"name": name, "value": value or "(empty)", "inline": inline})
+
+    embed["fields"] = fields_out
+
+    # Clamp total embed size (6000 chars across title/desc/fields/footer)
+    total = _embed_char_count(embed)
+    if total <= DISCORD_EMBED_TOTAL_MAX:
+        return embed
+
+    # Prefer shrinking description first
+    desc = str(embed.get("description") or "")
+    if desc:
+        over = total - DISCORD_EMBED_TOTAL_MAX
+        min_desc = 400
+        new_limit = max(min_desc, len(desc) - over)
+        embed["description"] = _clamp_text(desc, new_limit)
+
+    # If still too large, shrink long fields in a stable order
+    shrink_order = [
+        "📰 Top Headlines",
+        "🎯 Tickers to Watch",
+        "📋 Gov Contracts",
+        "🏛️ Political Trades",
+        "📅 Upcoming Earnings",
+        "₿ Crypto",
+        "🇺🇸 Equities",
+    ]
+
+    while True:
+        total = _embed_char_count(embed)
+        if total <= DISCORD_EMBED_TOTAL_MAX:
+            break
+
+        reduced = False
+        over = total - DISCORD_EMBED_TOTAL_MAX
+
+        for target in shrink_order:
+            for f in embed.get("fields") or []:
+                if f.get("name") != target:
+                    continue
+                v = str(f.get("value") or "")
+                if len(v) <= 80:
+                    continue
+                new_limit = max(80, len(v) - over)
+                f["value"] = _clamp_text(v, new_limit)
+                reduced = True
+                break
+            if reduced:
+                break
+
+        if not reduced:
+            break
+
+    return embed
 
 
 def main() -> int:
@@ -387,6 +487,14 @@ def main() -> int:
         ],
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},
     }
+
+    pre_chars = _embed_char_count(embed)
+    embed = _sanitize_embed(embed)
+    post_chars = _embed_char_count(embed)
+    if post_chars != pre_chars:
+        print(f"[report] Embed clamped to Discord limits: {pre_chars} -> {post_chars} chars")
+    else:
+        print(f"[report] Embed size chars: {post_chars}")
 
     payload = {"embeds": [embed]}
 
