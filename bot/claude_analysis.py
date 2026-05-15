@@ -11,12 +11,17 @@ from anthropic import Anthropic
 DEFAULT_MODEL = "claude-sonnet-4-6"  # Use exactly this model id
 
 
-def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
+def generate_analysis(
+    market_data: dict[str, Any],
+    report_type: str,
+    news_items: list[dict[str, str]] | None = None,
+) -> str:
     """Generate a 3-paragraph analysis using Anthropic Claude.
 
     Args:
       market_data: dict returned from bot/market_data.py
       report_type: "pre-market" or "post-market"
+      news_items: list of headline dicts from bot/news_fetcher.py
 
     Returns:
       analysis text, or a fallback string if the API call fails.
@@ -29,6 +34,17 @@ def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
 
     model = DEFAULT_MODEL
 
+    news_items = news_items or []
+    if news_items:
+        headlines_block = "Recent headlines:\n" + "\n".join(
+            f"{i}. [{it.get('source','Unknown')}] {it.get('headline','').strip()} ({it.get('published_et','').strip()})"
+            for i, it in enumerate(news_items, start=1)
+        )
+    else:
+        headlines_block = "Recent headlines:\n(no headlines available)"
+
+    market_block = f"```json\n{json.dumps(market_data, indent=2, sort_keys=True)}\n```"
+
     if report_type == "pre-market":
         system_prompt = (
             "You are a concise financial analyst writing a pre-market briefing for a small group "
@@ -36,13 +52,11 @@ def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
             "Focus on what the data suggests investors should watch today. "
             "Always include ET timestamps when referencing timing."
         )
-        user_prompt = (
+        instruction = (
             "Write a 3-paragraph pre-market briefing covering: "
             "(1) overnight/early equity market conditions based on the data, "
             "(2) crypto market conditions and any notable moves, "
-            "(3) 2-3 specific things to watch when the market opens at 9:30 AM ET today.\n\n"
-            "Market data (JSON):\n"
-            f"```json\n{json.dumps(market_data, indent=2, sort_keys=True)}\n```"
+            "(3) 2-3 specific things to watch when the market opens at 9:30 AM ET today."
         )
     else:
         system_prompt = (
@@ -51,14 +65,19 @@ def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
             "why it likely happened, and what it might mean for tomorrow. Always include ET timestamps "
             "when referencing timing."
         )
-        user_prompt = (
+        instruction = (
             "Write a 3-paragraph post-market recap covering: "
             "(1) how equities closed and what drove the day, "
             "(2) crypto performance and correlation to equities if notable, "
-            "(3) what today's action suggests for tomorrow's open.\n\n"
-            "Market data (JSON):\n"
-            f"```json\n{json.dumps(market_data, indent=2, sort_keys=True)}\n```"
+            "(3) what today's action suggests for tomorrow's open."
         )
+
+    user_prompt = (
+        "Market data (JSON):\n"
+        f"{market_block}\n\n"
+        f"{headlines_block}\n\n"
+        f"{instruction}"
+    )
 
     try:
         print(f"Calling Claude API (model={model})...", file=sys.stdout)

@@ -1,9 +1,10 @@
-"""Phase 2: market data + Claude analysis.
+"""Phase 3: news aggregation + Claude analysis.
 
-This script fetches basic market data (equities + crypto), asks Claude for a concise
-briefing/recap, and posts the result to a Discord webhook on a schedule via GitHub Actions.
+This script fetches basic market data (equities + crypto) and recent market headlines,
+asks Claude for a concise briefing/recap, and posts the result to a Discord webhook on a
+schedule via GitHub Actions.
 
-Phase 1 was a pipeline test; Phase 2 adds real data + AI analysis.
+Phase 1 was a pipeline test; Phase 2 added market data + AI; Phase 3 adds news context.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import requests
 
 from claude_analysis import generate_analysis
 from market_data import fetch_market_data
+from news_fetcher import fetch_top_headlines
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -82,8 +84,15 @@ def main() -> int:
         print(content)
         return 0
 
+    headlines = []
+    try:
+        headlines = fetch_top_headlines()
+    except Exception as exc:
+        print(f"WARNING: News fetch failed: {exc}", file=sys.stderr)
+        headlines = []
+
     print("Generating Claude analysis...", file=sys.stdout)
-    analysis = generate_analysis(market_data, report_type)
+    analysis = generate_analysis(market_data, report_type, headlines)
     analysis = (analysis or "Analysis unavailable at this time.").strip()
     if len(analysis) > 4000:
         analysis = analysis[:4000] + "…"
@@ -120,6 +129,16 @@ def main() -> int:
 
     fetched_at_et = market_data.get("fetched_at_et", now_et.strftime("%Y-%m-%d %H:%M ET"))
 
+    if headlines:
+        hl_lines = [
+            f"[{h.get('headline','').strip()}]({h.get('url','').strip()}) — {h.get('source','').strip()}"
+            for h in headlines[:5]
+            if (h.get("headline") and h.get("url"))
+        ]
+        headlines_value = "\n".join(hl_lines) if hl_lines else "No headlines available at this time."
+    else:
+        headlines_value = "No headlines available at this time."
+
     embed = {
         "title": title,
         "color": color,
@@ -127,6 +146,7 @@ def main() -> int:
         "fields": [
             {"name": "🇺🇸 Equities", "value": "\n".join(eq_lines), "inline": True},
             {"name": "₿ Crypto", "value": "\n".join(cr_lines), "inline": True},
+            {"name": "📰 Top Headlines", "value": headlines_value, "inline": False},
         ],
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},
     }
