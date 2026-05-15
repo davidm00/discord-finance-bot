@@ -46,6 +46,34 @@ def _ensure_utf8_console() -> None:
             pass
 
 
+def _load_env_local() -> None:
+    """Load repo-root .env.local for local testing (gitignored).
+
+    - Does nothing in GitHub Actions unless you also create that file there (you shouldn't).
+    - Never overwrites real environment variables.
+    """
+
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    path = os.path.join(repo_root, ".env.local")
+    if not os.path.exists(path):
+        return
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k and k not in os.environ:
+                    os.environ[k] = v
+        print("[weekly] Loaded .env.local for local testing")
+    except Exception as exc:
+        print(f"[weekly] WARNING: failed to load .env.local: {exc}")
+
+
 def _clamp_text(s: str, limit: int, ellipsis: str = "…") -> str:
     s = str(s or "")
     if len(s) <= limit:
@@ -337,6 +365,7 @@ def build_weekly_prompt(
 
 def main() -> int:
     _ensure_utf8_console()
+    _load_env_local()
     start = time.monotonic()
 
     print("[weekly] Starting weekly summary report...")
