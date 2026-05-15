@@ -10,16 +10,16 @@ on:
     # A guard step inside each job ensures only the correct season (EDT vs EST) continues.
 
     # Pre-market: 8:45 AM ET -> 12:45 UTC (EDT) or 13:45 UTC (EST)
-    - cron: '45 12 * * 1-5'
-    - cron: '45 13 * * 1-5'
+    - cron: '0 12 * * 1-5'
+    - cron: '0 13 * * 1-5'
 
     # Post-market: 4:15 PM ET -> 20:15 UTC (EDT) or 21:15 UTC (EST)
     - cron: '15 20 * * 1-5'
     - cron: '15 21 * * 1-5'
 
     # Weekly: Saturday 9:00 AM ET -> 13:00 UTC (EDT) or 14:00 UTC (EST)
+    - cron: '0 12 * * 6'
     - cron: '0 13 * * 6'
-    - cron: '0 14 * * 6'
 
   workflow_dispatch:
     inputs:
@@ -40,8 +40,8 @@ jobs:
   report:
     if: ${{
       (github.event_name == 'schedule' && (
-        github.event.schedule == '45 12 * * 1-5' ||
-        github.event.schedule == '45 13 * * 1-5' ||
+        github.event.schedule == '0 12 * * 1-5' ||
+        github.event.schedule == '0 13 * * 1-5' ||
         github.event.schedule == '15 20 * * 1-5' ||
         github.event.schedule == '15 21 * * 1-5'
       )) ||
@@ -80,8 +80,8 @@ jobs:
 
           expected=""
           case "$cron" in
-            "45 12 * * 1-5") expected=-4 ;;
-            "45 13 * * 1-5") expected=-5 ;;
+            "0 12 * * 1-5") expected=-4 ;;
+            "0 13 * * 1-5") expected=-5 ;;
             "15 20 * * 1-5") expected=-4 ;;
             "15 21 * * 1-5") expected=-5 ;;
             *) expected="" ;;
@@ -177,8 +177,8 @@ jobs:
   weekly-report:
     if: ${{
       (github.event_name == 'schedule' && (
-        github.event.schedule == '0 13 * * 6' ||
-        github.event.schedule == '0 14 * * 6'
+        github.event.schedule == '0 12 * * 6' ||
+        github.event.schedule == '0 13 * * 6'
       )) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.report_kind == 'weekly')
     }}
@@ -215,8 +215,8 @@ jobs:
 
           expected=""
           case "$cron" in
-            "0 13 * * 6") expected=-4 ;;
-            "0 14 * * 6") expected=-5 ;;
+            "0 12 * * 6") expected=-4 ;;
+            "0 13 * * 6") expected=-5 ;;
             *) expected="" ;;
           esac
 
