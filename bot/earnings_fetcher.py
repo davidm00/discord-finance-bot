@@ -102,9 +102,14 @@ def fetch_upcoming_earnings() -> list[dict[str, Any]]:
             eps_est = r.get("epsEstimate")
             eps_est_f = float(eps_est) if eps_est is not None else None
 
-            relevant = sym in WATCHLIST_TICKERS or (eps_est_f is not None and sym in MAJOR_SP500_TICKERS)
+            # Relevance filter:
+            # - Always include thematic watchlist tickers
+            # - Otherwise include any company with an EPS estimate (broad but useful)
+            relevant = sym in WATCHLIST_TICKERS or (eps_est_f is not None)
             if not relevant:
                 continue
+
+            score = 2 if sym in WATCHLIST_TICKERS else (1 if sym in MAJOR_SP500_TICKERS else 0)
 
             out.append(
                 {
@@ -113,14 +118,18 @@ def fetch_upcoming_earnings() -> list[dict[str, Any]]:
                     "date": d,
                     "time": time,
                     "eps_estimate": eps_est_f,
+                    "_score": score,
                 }
             )
         except Exception:
             continue
 
-    # Sort by date then symbol
-    out.sort(key=lambda x: (x.get("date") or "", x.get("symbol") or ""))
+    # Prefer watchlist/major tickers, then sort by date then symbol
+    out.sort(key=lambda x: (-(x.get("_score") or 0), x.get("date") or "", x.get("symbol") or ""))
 
     out = out[:5]
+    for x in out:
+        x.pop("_score", None)
+
     print(f"[earnings_fetcher] Filtered to {len(out)} relevant earnings")
     return out

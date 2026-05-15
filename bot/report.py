@@ -91,6 +91,63 @@ def _enforce_disclaimer(text: str) -> str:
     return base + "\n" + DISCLAIMER_LINE
 
 
+def _write_local_preview_markdown(embed: dict) -> str | None:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    out_dir = os.path.join(repo_root, "local-output")
+    out_path = os.path.join(out_dir, "latest_report.md")
+
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+
+        title = str(embed.get("title") or "").strip()
+        desc = str(embed.get("description") or "").strip()
+        fields = embed.get("fields") or []
+
+        parts: list[str] = []
+        parts.append(f"# {title}" if title else "# Discord Finance Bot — Local Preview")
+        parts.append("")
+        parts.append("## Analysis")
+        parts.append("")
+        parts.append(desc or "(no analysis)")
+        parts.append("")
+
+        for f in fields:
+            name = str((f or {}).get("name") or "").strip()
+            value = str((f or {}).get("value") or "").strip()
+            if not name:
+                continue
+            parts.append(f"## {name}")
+            parts.append("")
+            parts.append(value or "(empty)")
+            parts.append("")
+
+        with open(out_path, "w", encoding="utf-8") as out:
+            out.write("\n".join(parts).rstrip() + "\n")
+
+        return out_path
+    except Exception as exc:
+        print(f"[report] WARNING: failed to write local preview markdown: {exc}")
+        return None
+
+
+def _write_local_full_analysis(analysis: str) -> str | None:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    out_dir = os.path.join(repo_root, "local-output")
+    out_path = os.path.join(out_dir, "latest_claude_response.md")
+
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write((analysis or "").rstrip() + "\n")
+        return out_path
+    except Exception as exc:
+        print(f"[report] WARNING: failed to write full analysis: {exc}")
+        return None
+    except Exception as exc:
+        print(f"[report] WARNING: failed to write local preview markdown: {exc}")
+        return None
+
+
 def main() -> int:
     start = time.monotonic()
 
@@ -331,6 +388,15 @@ def main() -> int:
             "description_chars": len(embed.get("description") or ""),
         }
         print(f"[report] Embed preview: {preview}")
+
+        md_path = _write_local_preview_markdown(embed)
+        if md_path:
+            print(f"[report] Wrote local preview markdown: {md_path}")
+
+        full_path = _write_local_full_analysis(analysis)
+        if full_path:
+            print(f"[report] Wrote full Claude response: {full_path}")
+
         elapsed = time.monotonic() - start
         print(f"[report] Done. Total runtime: {elapsed:.1f}s")
         return 0

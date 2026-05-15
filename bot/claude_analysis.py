@@ -227,15 +227,16 @@ def generate_analysis(
             "Instead of 'macro headwinds', say 'the broader economy is creating problems'. Always "
             "explain WHY something matters, not just WHAT happened. When you reference previous "
             "reports, explicitly note what was predicted and whether it played out. Always include "
-            "ET timestamps."
+            "ET timestamps. Keep it short: target 350–550 words total."
         )
         analysis_instruction = (
-            "Write a 4-paragraph pre-market briefing:\n"
+            "Write a 4-paragraph pre-market briefing (keep each paragraph 2–3 sentences max):\n"
             "Paragraph 1: What the equity market data is telling us right now and why it matters.\n"
             "Paragraph 2: Crypto conditions and any plain-English signals on BTC, ETH, SOL.\n"
             "Paragraph 3: The most important news story or theme driving markets today and how it connects to any political trades or government contracts if relevant.\n"
             "Paragraph 4: If there are previous reports, note what was flagged and whether it played out. If not, skip this paragraph.\n"
-            "Then add a 'What to Watch' section with exactly 3 numbered bullet points — specific, plain-English things to watch at the 9:30 AM ET open."
+            "Then add a 'What to Watch' section with exactly 3 numbered bullet points (1 sentence each) — specific, plain-English things to watch at the 9:30 AM ET open.\n"
+            "Do not omit any required sections; if you're running long, shorten Paragraphs 1–3 instead of dropping sections."
         )
     else:
         system_prompt = (
@@ -246,19 +247,20 @@ def generate_analysis(
             "to lock in gains'. Instead of 'oversold conditions', say 'the stock has dropped a lot "
             "and may be due for a bounce'. Always explain WHY something matters, not just WHAT "
             "happened. When you reference previous reports, explicitly note what was predicted and "
-            "whether it played out. Always include ET timestamps."
+            "whether it played out. Always include ET timestamps. Keep it short: target 350–550 words total."
         )
         analysis_instruction = (
-            "Write a 4-paragraph post-market recap:\n"
+            "Write a 4-paragraph post-market recap (keep each paragraph 2–3 sentences max):\n"
             "Paragraph 1: How equities closed today and the main reason why in plain terms.\n"
             "Paragraph 2: Crypto performance today and what it suggests for overnight/tomorrow.\n"
             "Paragraph 3: The biggest news catalyst of the day and how it connected to market moves. Mention any political trades or contracts that are relevant.\n"
             "Paragraph 4: If there are previous reports, note what was flagged and whether it played out. If not, skip this paragraph.\n"
-            "Then add a 'Tomorrow Watch' section with exactly 3 numbered bullet points."
+            "Then add a 'Tomorrow Watch' section with exactly 3 numbered bullet points (1 sentence each).\n"
+            "Do not omit any required sections; if you're running long, shorten Paragraphs 1–3 instead of dropping sections."
         )
 
     ticker_instruction = (
-        "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers.\n"
+        "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers (prefer 3 unless there are truly strong signals for more).\n"
         "For each ticker provide:\n"
         "- The ticker symbol and company name\n"
         "- A rating: BUY / SELL / HOLD / WATCH\n"
@@ -269,9 +271,10 @@ def generate_analysis(
         "Rating: BUY\n"
         "Reason: ...\n"
         "Confidence: HIGH\n\n"
-        "Only recommend tickers that appear in today's actual data — news, contracts, political trades, market movers, or the thematic watchlist. Do not invent recommendations. If you cannot find 3 tickers with genuine signals, return fewer.\n"
-        "End with this exact disclaimer on its own line:\n"
-        f"'{DISCLAIMER_LINE}'"
+        "Only recommend tickers that appear in today's actual data — news, contracts, political trades, market movers, or the thematic watchlist. Do not invent recommendations.\n"
+        "Do not omit this section; if you're running long, shorten earlier paragraphs.\n"
+        "End with this exact disclaimer on its own line (no quotes):\n"
+        f"{DISCLAIMER_LINE}"
     )
 
     sections = [

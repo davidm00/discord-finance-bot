@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 
@@ -30,6 +31,15 @@ def parse_recommendations(text: str):
                 break
             buf.append(line.rstrip())
 
+        section_text = "\n".join(buf).strip()
+
+        if (os.getenv("PARSER_DEBUG") or "").strip().lower() in {"1", "true", "yes"}:
+            # Debug window so we can see what the parser matched.
+            window = "\n".join(lines[start : start + 30])
+            print(f"[parser] Section start line: {lines[start].strip()[:200]}")
+            print(f"[parser] Section window: {window[:800]}")
+            print(f"[parser] Raw section text: {section_text[:500]}")
+
         recs = []
         cur = None
 
@@ -42,39 +52,51 @@ def parse_recommendations(text: str):
             cur = None
 
         for raw in buf:
-            line = raw.strip()
-            if not line:
-                continue
-
-            # New record if line starts with a likely ticker pattern: "TICKER — ..." or "TICKER - ..."
-            sep = "—" if "—" in line else ("-" if "-" in line else None)
-            if sep:
-                left = line.split(sep, 1)[0].strip()
-                if left.isalpha() and left.isupper() and 1 <= len(left) <= 6:
-                    flush()
-                    cur = {"ticker": left, "rating": "", "reason": "", "confidence": ""}
+            # Claude sometimes concatenates blocks like: "Confidence: MEDIUM---**NVDA — Nvidia**"
+            # Split on common separators to keep parsing simple and robust.
+            chunks = [c.strip() for c in raw.split("---") if c.strip()]
+            for chunk in chunks:
+                line = chunk.strip()
+                if not line:
                     continue
 
-            if cur is None:
-                continue
+                # New record if line contains a likely ticker pattern: "**TICKER — ...**" or "TICKER — ..."
+                if "—" in line or " - " in line:
+                    sep = "—" if "—" in line else "-"
+                    left = line.split(sep, 1)[0].strip()
+                    left = left.replace("**", "").replace("*", "").lstrip("-").strip()
 
-            if line.lower().startswith("rating:"):
-                val = line.split(":", 1)[1].strip().upper()
-                cur["rating"] = val if val in RATINGS else val
-                continue
+                    # Allow tickers like BRK.B
+                    ticker = left
+                    allowed = all(ch.isalnum() or ch in {".", "-"} for ch in ticker)
+                    has_letter = any(ch.isalpha() for ch in ticker)
+                    if allowed and has_letter and ticker.upper() == ticker and 1 <= len(ticker) <= 8:
+                        flush()
+                        cur = {"ticker": ticker, "rating": "", "reason": "", "confidence": ""}
+                        continue
 
-            if line.lower().startswith("confidence:"):
-                val = line.split(":", 1)[1].strip().upper()
-                cur["confidence"] = val if val in CONFIDENCE else val
-                continue
+                if cur is None:
+                    continue
 
-            if line.lower().startswith("reason:") or line.lower().startswith("why:"):
-                cur["reason"] = line.split(":", 1)[1].strip()
-                continue
+                low = line.lower()
 
-            # Fallback: if we don't have a reason yet, take the first free-form sentence.
-            if not cur.get("reason"):
-                cur["reason"] = line
+                if low.startswith("rating:"):
+                    val = line.split(":", 1)[1].strip().upper()
+                    cur["rating"] = val if val in RATINGS else val
+                    continue
+
+                if low.startswith("confidence:"):
+                    val = line.split(":", 1)[1].strip().upper()
+                    cur["confidence"] = val if val in CONFIDENCE else val
+                    continue
+
+                if low.startswith("reason:") or low.startswith("why:"):
+                    cur["reason"] = line.split(":", 1)[1].strip()
+                    continue
+
+                # Fallback: if we don't have a reason yet, take the first free-form sentence.
+                if not cur.get("reason"):
+                    cur["reason"] = line
 
         flush()
 
