@@ -11,9 +11,9 @@ on:
     # Pre-market: 8:45 AM ET -> 12:45 UTC (EDT) or 13:45 UTC (EST)
     - cron: '45 12 * * 1-5'
     - cron: '45 13 * * 1-5'
-    # Post-market (TEMP TEST): 5:13 PM ET -> 21:13 UTC (EDT) or 22:13 UTC (EST)
-    - cron: '13 21 * * 1-5'
-    - cron: '13 22 * * 1-5'
+    # Post-market: 4:15 PM ET -> 20:15 UTC (EDT) or 21:15 UTC (EST)
+    - cron: '15 20 * * 1-5'
+    - cron: '15 21 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -21,10 +21,78 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Schedule guard (EDT/EST)
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== Schedule guard ====="
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
+            echo "Non-schedule event; allowing run."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cron=$(python - <<'PY'
+import json, os
+p=os.environ.get('GITHUB_EVENT_PATH')
+with open(p,'r',encoding='utf-8') as f:
+  d=json.load(f)
+print(d.get('schedule',''))
+PY
+          )
+          echo "Triggered cron: $cron"
+
+          # Determine ET offset (EDT=-4, EST=-5)
+          offset=$(python - <<'PY'
+from datetime import datetime, timezone
+import os
+import pytz
+et=pytz.timezone('America/New_York')
+now=datetime.now(timezone.utc).astimezone(et)
+print(int(now.utcoffset().total_seconds()//3600))
+PY
+          )
+          echo "ET UTC offset hours: $offset"
+
+          # Map cron -> expected offset
+          # Pre-market 08:45 ET: 12:45 UTC (EDT=-4) or 13:45 UTC (EST=-5)
+          # Post-market 16:15 ET: 20:15 UTC (EDT=-4) or 21:15 UTC (EST=-5)
+          expected=""
+          case "$cron" in
+            "45 12 * * 1-5") expected=-4 ;;
+            "45 13 * * 1-5") expected=-5 ;;
+            "15 20 * * 1-5") expected=-4 ;;
+            "15 21 * * 1-5") expected=-5 ;;
+            *) expected="" ;;
+          esac
+
+          if [ -z "$expected" ]; then
+            echo "Unknown cron; allowing run (fail-open)."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$offset" = "$expected" ]; then
+            echo "Offset matches expected; allowing run."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Offset mismatch; skipping run." >&2
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "=========================="
+
       - name: Checkout
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Log job context
+        if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -39,17 +107,20 @@ jobs:
           echo "======================="
 
       - name: Set up Python
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Cache pip
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: Verify Python
+        if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -57,6 +128,7 @@ jobs:
           python -m pip --version
 
       - name: Install dependencies
+        if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -66,6 +138,7 @@ jobs:
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
       - name: Run report
+        if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail

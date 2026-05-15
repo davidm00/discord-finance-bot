@@ -257,27 +257,6 @@ def _sanitize_embed(embed: dict) -> dict:
     return embed
 
 
-def _within_minutes(now: datetime, hh: int, mm: int, window_min: int = 30) -> bool:
-    target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
-    delta = abs((now - target).total_seconds())
-    return delta <= window_min * 60
-
-
-def _should_post_now(now_et: datetime, report_type: str) -> bool:
-    # GitHub schedule cron is UTC and can't express DST reliably.
-    # We run twice (EDT+EST UTC equivalents) and only POST when we're close to the intended ET times.
-    event = (os.getenv("GITHUB_EVENT_NAME") or "").strip()
-    if event == "workflow_dispatch":
-        return True
-
-    if (os.getenv("FORCE_RUN") or "").strip().lower() in {"1", "true", "yes"}:
-        return True
-
-    if report_type == "pre-market":
-        return _within_minutes(now_et, 8, 45)
-    return _within_minutes(now_et, 16, 15)
-
-
 def main() -> int:
     _ensure_utf8_console()
 
@@ -297,13 +276,6 @@ def main() -> int:
     date_et = now_et.strftime("%Y-%m-%d")
 
     print(f"[report] Report type: {report_type} ({date_et} ET)")
-
-    if os.getenv("GITHUB_ACTIONS") == "true" and not _should_post_now(now_et, report_type):
-        print(
-            f"[report] Skipping scheduled run (guard): now={now_et.strftime('%Y-%m-%d %H:%M ET')}"
-            f" expected={'08:45 ET' if report_type == 'pre-market' else '16:15 ET'}"
-        )
-        return 0
 
     print("[report] Fetching previous Discord reports...")
     previous_reports = []

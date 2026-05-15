@@ -25,7 +25,7 @@ Workflow: `.github/workflows/report.yml`
 Triggers:
 - **schedule**: 8:45 AM ET and 4:15 PM ET (Mon–Fri)
   - Note: GitHub Actions cron is **UTC** and doesn't support DST properly.
-  - This repo schedules **both** the EDT and EST UTC equivalents and uses a small guard in `bot/report.py` so only runs near the intended ET times actually post.
+  - This repo schedules **both** the EDT and EST UTC equivalents and uses a workflow-level guard step so only the correct season (EDT vs EST) runs.
 - **workflow_dispatch**: manual runs from the Actions tab
 
 The workflow installs dependencies from `requirements.txt` and caches pip (`~/.cache/pip`) between runs.
