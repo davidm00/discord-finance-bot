@@ -1,11 +1,12 @@
-"""Phase 4: enhanced crypto data + news + Claude analysis.
+"""Phase 5: political disclosures + contracts + correlations.
 
-This script fetches basic equity market data, enhanced crypto data (CoinGecko), and recent
-market headlines, asks Claude for a concise briefing/recap, and posts the result to a
-Discord webhook on a schedule via GitHub Actions.
+This script fetches basic equity market data, enhanced crypto data (CoinGecko), recent market
+headlines, and free public political/contract datasets (Capitol Trades + USASpending), then
+asks Claude for a concise briefing/recap and posts the result to a Discord webhook on a
+schedule via GitHub Actions.
 
 Phase 1 was a pipeline test; Phase 2 added market data + AI; Phase 3 added news; Phase 4
-upgrades crypto via CoinGecko.
+upgraded crypto; Phase 5 adds political trades, contracts, and correlation context.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from claude_analysis import generate_analysis
 from crypto_data import fetch_crypto_data
 from market_data import fetch_market_data
 from news_fetcher import fetch_top_headlines
+from political_data import fetch_political_data
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -100,8 +102,15 @@ def main() -> int:
         print(f"WARNING: News fetch failed: {exc}", file=sys.stderr)
         headlines = []
 
+    political_data = {}
+    try:
+        political_data = fetch_political_data()
+    except Exception as exc:
+        print(f"WARNING: Political data fetch failed: {exc}", file=sys.stderr)
+        political_data = {}
+
     print("Generating Claude analysis...", file=sys.stdout)
-    analysis = generate_analysis(market_data, report_type, headlines, crypto_data)
+    analysis = generate_analysis(market_data, report_type, headlines, crypto_data, political_data)
     analysis = (analysis or "Analysis unavailable at this time.").strip()
     if len(analysis) > 4000:
         analysis = analysis[:4000] + "…"
@@ -163,6 +172,30 @@ def main() -> int:
     else:
         headlines_value = "No headlines available at this time."
 
+    trades = (political_data or {}).get("trades", []) if isinstance(political_data, dict) else []
+    contracts = (political_data or {}).get("contracts", []) if isinstance(political_data, dict) else []
+    correlations = (political_data or {}).get("correlations", []) if isinstance(political_data, dict) else []
+
+    if trades:
+        trade_lines = [
+            f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} ${str(t.get('ticker','')).upper()} | {t.get('amount_range','').strip()} | {t.get('trade_date','').strip()}"
+            for t in trades[:5]
+        ]
+        trades_value = "\n".join(trade_lines) if trade_lines else "No recent trades above $25K."
+    else:
+        trades_value = "No recent trades above $25K."
+
+    if contracts:
+        contract_lines = [
+            f"{c.get('recipient','').strip()}: {c.get('amount_human', c.get('amount',''))} | {c.get('agency','').strip()}"
+            for c in contracts[:3]
+        ]
+        contracts_value = "\n".join(contract_lines) if contract_lines else "No major contracts found."
+        if correlations:
+            contracts_value += f"\n\n⚠️ {len(correlations)} correlation(s) detected — see analysis above"
+    else:
+        contracts_value = "No major contracts found."
+
     embed = {
         "title": title,
         "color": color,
@@ -170,6 +203,8 @@ def main() -> int:
         "fields": [
             {"name": "🇺🇸 Equities", "value": "\n".join(eq_lines), "inline": True},
             {"name": "₿ Crypto", "value": "\n".join(cr_lines), "inline": True},
+            {"name": "🏛️ Political Trades", "value": trades_value, "inline": False},
+            {"name": "📋 Gov Contracts", "value": contracts_value, "inline": False},
             {"name": "📰 Top Headlines", "value": headlines_value, "inline": False},
         ],
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},

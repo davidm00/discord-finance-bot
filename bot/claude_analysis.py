@@ -16,6 +16,7 @@ def generate_analysis(
     report_type: str,
     news_items: list[dict[str, str]] | None = None,
     crypto_data: dict[str, Any] | None = None,
+    political_data: dict[str, Any] | None = None,
 ) -> str:
     """Generate a 3-paragraph analysis using Anthropic Claude.
 
@@ -24,6 +25,7 @@ def generate_analysis(
       report_type: "pre-market" or "post-market"
       news_items: list of headline dicts from bot/news_fetcher.py
       crypto_data: dict returned from bot/crypto_data.py (CoinGecko)
+      political_data: dict returned from bot/political_data.py
 
     Returns:
       analysis text, or a fallback string if the API call fails.
@@ -104,7 +106,8 @@ def generate_analysis(
             "You are a concise financial analyst writing a pre-market briefing for a small group "
             "of personal investors. Your tone is clear, direct, and informative — not hype. "
             "Focus on what the data suggests investors should watch today. "
-            "Always include ET timestamps when referencing timing."
+            "Always include ET timestamps when referencing timing. "
+            "When correlations exist between politician trades and government contracts, explain them in plain terms — what the pattern might suggest, without assuming wrongdoing."
         )
         instruction = (
             "Write a 3-paragraph pre-market briefing covering: "
@@ -117,7 +120,8 @@ def generate_analysis(
             "You are a concise financial analyst writing a post-market recap for a small group of personal investors. "
             "Your tone is clear, direct, and informative — not hype. Focus on what happened today, "
             "why it likely happened, and what it might mean for tomorrow. Always include ET timestamps "
-            "when referencing timing."
+            "when referencing timing. "
+            "When correlations exist between politician trades and government contracts, explain them in plain terms — what the pattern might suggest, without assuming wrongdoing."
         )
         instruction = (
             "Write a 3-paragraph post-market recap covering: "
@@ -126,11 +130,74 @@ def generate_analysis(
             "(3) what today's action suggests for tomorrow's open."
         )
 
+    def _political_block() -> str:
+        if political_data is None or not isinstance(political_data, dict):
+            trades = []
+            contracts = []
+            correlations = []
+        else:
+            trades = political_data.get("trades") or []
+            contracts = political_data.get("contracts") or []
+            correlations = political_data.get("correlations") or []
+
+        lines: list[str] = ["Recent congressional trades (>= $25K, last 7 days):"]
+        if trades:
+            for t in trades[:10]:
+                pol = str(t.get("politician") or "").strip()
+                party = str(t.get("party") or "?").strip()
+                chamber = str(t.get("chamber") or "?").strip()
+                tt = str(t.get("trade_type") or "?").upper()
+                tick = str(t.get("ticker") or "").strip().upper()
+                amt = str(t.get("amount_range") or "").strip()
+                td = str(t.get("trade_date") or "").strip()
+                lines.append(f"{pol} ({party}/{chamber}): {tt} {tick} | {amt} | traded {td}")
+        else:
+            lines.append("No recent trades above $25K.")
+
+        lines.append("")
+        lines.append("Major government contracts (>= $50M, last 30 days, defense/energy/tech):")
+        if contracts:
+            for c in contracts[:10]:
+                rec = str(c.get("recipient") or "").strip()
+                amt = str(c.get("amount_human") or c.get("amount") or "").strip()
+                agency = str(c.get("agency") or "").strip()
+                cd = str(c.get("date") or "").strip()
+                desc = str(c.get("description") or "").strip()
+                lines.append(f"{rec}: {amt} | {agency} | {cd}")
+                if desc:
+                    lines.append(f"Description: {desc[:240]}")
+        else:
+            lines.append("No major contracts found.")
+
+        lines.append("")
+        lines.append("Potential correlations (same company in trades + contracts within 30 days):")
+        if correlations:
+            for x in correlations[:10]:
+                comp = str(x.get("company") or "").strip()
+                tick = str(x.get("ticker") or "").strip().upper()
+                ca = str(x.get("contract_amount") or "").strip()
+                cdate = str(x.get("contract_date") or "").strip()
+                pol = str(x.get("politician") or "").strip()
+                ttype = str(x.get("trade_type") or "").strip().upper()
+                tamt = str(x.get("trade_amount_range") or "").strip()
+                tdate = str(x.get("trade_date") or "").strip()
+                days = str(x.get("days_apart") or "")
+                lines.append(
+                    f"{comp} ({tick}): Contract {ca} on {cdate} | {pol} {ttype} {tamt} on {tdate} ({days} days apart)"
+                )
+        else:
+            lines.append("No correlations detected.")
+
+        return "\n".join(lines)
+
+    political_block = _political_block()
+
     user_prompt = (
         "Market data (JSON):\n"
         f"{market_block}\n\n"
         f"{headlines_block}\n\n"
         f"{crypto_block}\n\n"
+        f"{political_block}\n\n"
         f"{instruction}"
     )
 
