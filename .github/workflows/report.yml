@@ -1,5 +1,8 @@
 name: Scheduled Finance Report
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     - cron: '45 8 * * 1-5'
@@ -35,6 +38,12 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
       - name: Verify Python
         shell: bash
         run: |
@@ -48,7 +57,7 @@ jobs:
           set -euo pipefail
           echo "[START] Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
           python -m pip install --upgrade pip --disable-pip-version-check
-          pip install --disable-pip-version-check requests pytz yfinance anthropic feedparser beautifulsoup4 lxml
+          pip install --disable-pip-version-check -r requirements.txt
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
       - name: Run report
@@ -67,3 +76,5 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}

@@ -1,0 +1,7 @@
+yfinance
+anthropic
+pytz
+requests
+feedparser
+beautifulsoup4
+lxml

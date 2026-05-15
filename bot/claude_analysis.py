@@ -7,45 +7,40 @@ from typing import Any
 
 from anthropic import Anthropic
 
+DEFAULT_MODEL = "claude-sonnet-4-6"
 
-DEFAULT_MODEL = "claude-sonnet-4-6"  # Use exactly this model id
+THEMATIC_WATCHLIST = {
+    "defense": ["LMT", "RTX", "NOC", "GD", "BA", "LDOS", "SAIC", "BAH", "HII", "TDG"],
+    "cyber": ["CRWD", "PANW", "ZS", "FTNT", "S", "CYBR", "PLTR"],
+    "energy": ["XOM", "CVX", "COP", "SLB", "HAL", "EOG", "MPC"],
+    "tech": ["NVDA", "AMD", "MSFT", "GOOGL", "META", "AMZN", "AAPL"],
+}
+
+DISCLAIMER_LINE = "⚠️ Not financial advice. For informational purposes only. Always do your own research."
 
 
 def generate_analysis(
     market_data: dict[str, Any],
+    crypto_data: dict[str, Any] | None,
+    news_items: list[dict[str, str]] | None,
+    political_data: dict[str, Any] | None,
+    previous_reports: list[dict[str, Any]] | None,
+    earnings: list[dict[str, Any]] | None,
     report_type: str,
-    news_items: list[dict[str, str]] | None = None,
-    crypto_data: dict[str, Any] | None = None,
-    political_data: dict[str, Any] | None = None,
 ) -> str:
-    """Generate a 3-paragraph analysis using Anthropic Claude.
-
-    Args:
-      market_data: dict returned from bot/market_data.py
-      report_type: "pre-market" or "post-market"
-      news_items: list of headline dicts from bot/news_fetcher.py
-      crypto_data: dict returned from bot/crypto_data.py (CoinGecko)
-      political_data: dict returned from bot/political_data.py
-
-    Returns:
-      analysis text, or a fallback string if the API call fails.
-    """
-
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        print("WARNING: ANTHROPIC_API_KEY is not set; skipping analysis.", file=sys.stderr)
-        return "Analysis unavailable at this time."
+        print("[claude] WARNING: ANTHROPIC_API_KEY is not set; skipping analysis.")
+        return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
-    model = DEFAULT_MODEL
+    print(f"[claude] Building prompt for {report_type}...")
 
     news_items = news_items or []
-    if news_items:
-        headlines_block = "Recent headlines:\n" + "\n".join(
-            f"{i}. [{it.get('source','Unknown')}] {it.get('headline','').strip()} ({it.get('published_et','').strip()})"
-            for i, it in enumerate(news_items, start=1)
-        )
-    else:
-        headlines_block = "Recent headlines:\n(no headlines available)"
+    previous_reports = previous_reports or []
+    earnings = earnings or []
+
+    print(f"[claude] Previous reports included: {len(previous_reports)}")
+    print(f"[claude] Earnings included: {len(earnings)}")
 
     market_block = f"```json\n{json.dumps(market_data, indent=2, sort_keys=True)}\n```"
 
@@ -62,13 +57,17 @@ def generate_analysis(
             return f"${v / 1_000_000:,.2f}M"
         return f"${v:,.0f}"
 
+    # (2) Crypto data block
     if crypto_data is None:
-        crypto_block = "Crypto data unavailable."
+        crypto_block = "Crypto market data:\nCrypto data unavailable."
     else:
         major = crypto_data.get("major", {}) if isinstance(crypto_data, dict) else {}
         movers = crypto_data.get("notable_movers", []) if isinstance(crypto_data, dict) else []
 
-        lines: list[str] = ["Crypto market data:"]
+        lines: list[str] = [
+            "Crypto market data:",
+            "For each major crypto, add a plain-English signal: is the price action suggesting continuation, reversal, or uncertainty? Keep it to one short sentence.",
+        ]
         for sym in ("BTC", "ETH", "SOL"):
             d = major.get(sym) or {}
             price = d.get("price")
@@ -83,8 +82,8 @@ def generate_analysis(
             )
 
         lines.append("")
+        lines.append("Notable altcoin movers (>=8% move):")
         if movers:
-            lines.append("Notable altcoin movers (>=8% move):")
             for m in movers:
                 ms = str(m.get("symbol") or "").upper()
                 name = str(m.get("name") or "").strip()
@@ -96,40 +95,20 @@ def generate_analysis(
                     f"{ms} ({name}): {_fmt_price(float(price))} ({_arrow(float(pct))} {abs(float(pct)):.2f}% 24h)"
                 )
         else:
-            lines.append("Notable altcoin movers (>=8% move):")
             lines.append("No notable altcoin movers in top 20.")
 
         crypto_block = "\n".join(lines)
 
-    if report_type == "pre-market":
-        system_prompt = (
-            "You are a concise financial analyst writing a pre-market briefing for a small group "
-            "of personal investors. Your tone is clear, direct, and informative — not hype. "
-            "Focus on what the data suggests investors should watch today. "
-            "Always include ET timestamps when referencing timing. "
-            "When correlations exist between politician trades and government contracts, explain them in plain terms — what the pattern might suggest, without assuming wrongdoing."
-        )
-        instruction = (
-            "Write a 3-paragraph pre-market briefing covering: "
-            "(1) overnight/early equity market conditions based on the data, "
-            "(2) crypto market conditions and any notable moves, "
-            "(3) 2-3 specific things to watch when the market opens at 9:30 AM ET today."
+    # (3) News headlines block
+    if news_items:
+        headlines_block = "Recent headlines:\n" + "\n".join(
+            f"{i}. [{it.get('source','Unknown')}] {it.get('headline','').strip()} ({it.get('published_et','').strip()})"
+            for i, it in enumerate(news_items, start=1)
         )
     else:
-        system_prompt = (
-            "You are a concise financial analyst writing a post-market recap for a small group of personal investors. "
-            "Your tone is clear, direct, and informative — not hype. Focus on what happened today, "
-            "why it likely happened, and what it might mean for tomorrow. Always include ET timestamps "
-            "when referencing timing. "
-            "When correlations exist between politician trades and government contracts, explain them in plain terms — what the pattern might suggest, without assuming wrongdoing."
-        )
-        instruction = (
-            "Write a 3-paragraph post-market recap covering: "
-            "(1) how equities closed and what drove the day, "
-            "(2) crypto performance and correlation to equities if notable, "
-            "(3) what today's action suggests for tomorrow's open."
-        )
+        headlines_block = "Recent headlines:\n(no headlines available)"
 
+    # (4) Political block (same format as Phase 5)
     def _political_block() -> str:
         if political_data is None or not isinstance(political_data, dict):
             trades = []
@@ -192,69 +171,153 @@ def generate_analysis(
 
     political_block = _political_block()
 
-    user_prompt = (
-        "Market data (JSON):\n"
-        f"{market_block}\n\n"
-        f"{headlines_block}\n\n"
-        f"{crypto_block}\n\n"
-        f"{political_block}\n\n"
-        f"{instruction}"
+    # (5) Earnings section
+    earnings_block = ""
+    if earnings:
+        lines = ["Upcoming earnings (next 3 days):"]
+        for e in earnings:
+            sym = str(e.get("symbol") or "").upper().strip()
+            comp = str(e.get("company") or "").strip()
+            d = str(e.get("date") or "").strip()
+            t = str(e.get("time") or "").strip() or "Unknown"
+            eps = e.get("eps_estimate")
+            eps_str = str(eps) if eps is not None else "Unknown"
+            lines.append(f"{sym} ({comp}): {d} {t}")
+            lines.append(f"EPS estimate: {eps_str}")
+        earnings_block = "\n".join(lines)
+
+    # (6) Thematic watchlist
+    watchlist_block = (
+        "Thematic watchlist for reference:\n"
+        "Defense: LMT, RTX, NOC, GD, BA, LDOS, SAIC, BAH, HII, TDG\n"
+        "Cyber: CRWD, PANW, ZS, FTNT, S, CYBR, PLTR\n"
+        "Energy: XOM, CVX, COP, SLB, HAL, EOG, MPC\n"
+        "Tech: NVDA, AMD, MSFT, GOOGL, META, AMZN, AAPL\n"
+        "Flag any of these tickers that appear in today's news, contracts, or political trades."
     )
 
-    try:
-        print(f"Calling Claude API (model={model})...", file=sys.stdout)
-        client = Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model=model,
-            max_tokens=600,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+    # (7) Previous reports
+    prev_block = ""
+    if previous_reports:
+        parts = ["Previous report context:"]
+        for pr in previous_reports[:2]:
+            rt = pr.get("report_type") or "unknown"
+            ts = pr.get("timestamp_et") or ""
+            analysis = pr.get("analysis") or ""
+            fields = pr.get("fields") or {}
+            # light summary
+            field_summary = "; ".join(f"{k}: {str(v)[:120]}" for k, v in list(fields.items())[:6])
+            parts.append(f"--- {rt} from {ts} ---")
+            parts.append(str(analysis).strip())
+            parts.append(f"Key data from that report: {field_summary}")
+            parts.append("---")
+        parts.append(
+            "When writing today's report, reference what was flagged previously and whether those predictions or signals played out."
+        )
+        prev_block = "\n".join(parts)
+
+    # System prompt + instructions
+    if report_type == "pre-market":
+        system_prompt = (
+            "You are a sharp, plain-spoken financial analyst writing a morning briefing for a small "
+            "group of everyday investors who are smart but not finance professionals. Write like a "
+            "knowledgeable friend texting them what they need to know before the market opens — "
+            "clear, direct, and useful. No jargon. Instead of 'risk-on sentiment', say 'investors "
+            "are feeling confident'. Instead of 'institutional conviction', say 'big money is buying'. "
+            "Instead of 'macro headwinds', say 'the broader economy is creating problems'. Always "
+            "explain WHY something matters, not just WHAT happened. When you reference previous "
+            "reports, explicitly note what was predicted and whether it played out. Always include "
+            "ET timestamps."
+        )
+        analysis_instruction = (
+            "Write a 4-paragraph pre-market briefing:\n"
+            "Paragraph 1: What the equity market data is telling us right now and why it matters.\n"
+            "Paragraph 2: Crypto conditions and any plain-English signals on BTC, ETH, SOL.\n"
+            "Paragraph 3: The most important news story or theme driving markets today and how it connects to any political trades or government contracts if relevant.\n"
+            "Paragraph 4: If there are previous reports, note what was flagged and whether it played out. If not, skip this paragraph.\n"
+            "Then add a 'What to Watch' section with exactly 3 numbered bullet points — specific, plain-English things to watch at the 9:30 AM ET open."
+        )
+    else:
+        system_prompt = (
+            "You are a sharp, plain-spoken financial analyst writing an end-of-day recap for a small "
+            "group of everyday investors who are smart but not finance professionals. Write like a "
+            "knowledgeable friend explaining what happened today and what it means for tomorrow — "
+            "clear, direct, and useful. No jargon. Instead of 'profit-taking', say 'investors sold "
+            "to lock in gains'. Instead of 'oversold conditions', say 'the stock has dropped a lot "
+            "and may be due for a bounce'. Always explain WHY something matters, not just WHAT "
+            "happened. When you reference previous reports, explicitly note what was predicted and "
+            "whether it played out. Always include ET timestamps."
+        )
+        analysis_instruction = (
+            "Write a 4-paragraph post-market recap:\n"
+            "Paragraph 1: How equities closed today and the main reason why in plain terms.\n"
+            "Paragraph 2: Crypto performance today and what it suggests for overnight/tomorrow.\n"
+            "Paragraph 3: The biggest news catalyst of the day and how it connected to market moves. Mention any political trades or contracts that are relevant.\n"
+            "Paragraph 4: If there are previous reports, note what was flagged and whether it played out. If not, skip this paragraph.\n"
+            "Then add a 'Tomorrow Watch' section with exactly 3 numbered bullet points."
         )
 
-        # SDK returns a structured content list
+    ticker_instruction = (
+        "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers.\n"
+        "For each ticker provide:\n"
+        "- The ticker symbol and company name\n"
+        "- A rating: BUY / SELL / HOLD / WATCH\n"
+        "- One plain-English sentence explaining exactly why, citing the specific data point from today's report that drives the call\n"
+        "- A confidence level: HIGH / MEDIUM / LOW\n\n"
+        "Format each ticker block like:\n"
+        "TICKER — Company Name\n"
+        "Rating: BUY\n"
+        "Reason: ...\n"
+        "Confidence: HIGH\n\n"
+        "Only recommend tickers that appear in today's actual data — news, contracts, political trades, market movers, or the thematic watchlist. Do not invent recommendations. If you cannot find 3 tickers with genuine signals, return fewer.\n"
+        "End with this exact disclaimer on its own line:\n"
+        f"'{DISCLAIMER_LINE}'"
+    )
+
+    sections = [
+        "Market data (JSON):\n" + market_block,
+        crypto_block,
+        headlines_block,
+        political_block,
+    ]
+
+    if earnings_block:
+        sections.append(earnings_block)
+
+    sections.append(watchlist_block)
+
+    if prev_block:
+        sections.append(prev_block)
+
+    full_prompt = "\n\n".join(sections + [analysis_instruction, ticker_instruction])
+
+    print(f"[claude] Prompt token estimate: ~{len(full_prompt) // 4} tokens")
+    print(f"[claude] Calling Claude API (model={DEFAULT_MODEL})...")
+
+    try:
+        client = Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=DEFAULT_MODEL,
+            max_tokens=1200,
+            system=system_prompt,
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+
         parts = getattr(msg, "content", None)
         if not parts:
-            return "Analysis unavailable at this time."
+            return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
         text = getattr(parts[0], "text", None)
-        if not text:
-            return "Analysis unavailable at this time."
+        out = (str(text).strip() if text else "").strip()
+        if not out:
+            return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
-        return str(text).strip()
+        print(f"[claude] Response received: {len(out)} chars")
+
+        if DISCLAIMER_LINE not in out:
+            out = out.rstrip() + "\n" + DISCLAIMER_LINE
+
+        return out
     except Exception as exc:
-        # Log the real error details for debugging in GitHub Actions logs.
-        print("ERROR: Claude API call failed.", file=sys.stderr)
-        print(f"ERROR_TYPE: {type(exc).__name__}", file=sys.stderr)
-        print(f"ERROR_MESSAGE: {exc}", file=sys.stderr)
-
-        status_code = getattr(exc, "status_code", None)
-        if status_code is not None:
-            print(f"HTTP_STATUS: {status_code}", file=sys.stderr)
-
-        request_id = getattr(exc, "request_id", None)
-        if request_id:
-            print(f"REQUEST_ID: {request_id}", file=sys.stderr)
-
-        body = getattr(exc, "body", None)
-        if body is not None:
-            try:
-                print("ERROR_BODY:", json.dumps(body, indent=2, default=str)[:8000], file=sys.stderr)
-            except Exception:
-                print(f"ERROR_BODY: {body}", file=sys.stderr)
-
-        response = getattr(exc, "response", None)
-        if response is not None:
-            # Avoid dumping request headers; just summarize response if possible.
-            try:
-                resp_status = getattr(response, "status_code", None)
-                if resp_status is not None:
-                    print(f"RESPONSE_STATUS: {resp_status}", file=sys.stderr)
-                resp_text = None
-                if hasattr(response, "text"):
-                    resp_text = response.text
-                if resp_text:
-                    print("RESPONSE_TEXT:", str(resp_text)[:8000], file=sys.stderr)
-            except Exception:
-                print(f"RESPONSE: {response}", file=sys.stderr)
-
-        return "Analysis unavailable at this time."
+        print(f"[claude] WARNING: {exc}")
+        return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
