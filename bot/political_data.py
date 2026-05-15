@@ -47,29 +47,35 @@ def _fmt_et(dt: datetime) -> str:
 
 
 def _parse_amount_min(amount_range: str) -> float | None:
-    """Parse the minimum amount from a Capitol Trades range string."""
+    """Parse the minimum amount from a Capitol Trades range string.
+
+    Capitol Trades commonly shows ranges like "1K–15K", "50K–100K", "1M+", sometimes
+    with or without "$" and using en dashes.
+    """
 
     if not amount_range:
         return None
 
-    s = amount_range.replace(" ", "").replace("—", "-").replace("–", "-")
+    s = amount_range.strip()
+    s = s.replace(" ", "")
+    s = s.replace("—", "-").replace("–", "-")
+    s = s.replace("$", "")
 
-    # Examples: "$15K-$50K", "$1M+", "$500K-$1M"
-    m = re.match(r"^\$([0-9]+(?:\.[0-9]+)?)([KMB])\+?$", s, re.IGNORECASE)
-    if m:
-        num = float(m.group(1))
-        suf = m.group(2).upper()
-        mult = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}.get(suf, 1)
+    def _to_usd(num: float, suf: str) -> float:
+        mult = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}.get(suf.upper(), 1)
         return num * mult
 
-    m = re.match(r"^\$([0-9]+(?:\.[0-9]+)?)([KMB])\-\$([0-9]+(?:\.[0-9]+)?)([KMB])$", s, re.IGNORECASE)
+    # Single bound: 1M+
+    m = re.match(r"^([0-9]+(?:\.[0-9]+)?)([KMB])\+?$", s, re.IGNORECASE)
     if m:
-        num = float(m.group(1))
-        suf = m.group(2).upper()
-        mult = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}.get(suf, 1)
-        return num * mult
+        return _to_usd(float(m.group(1)), m.group(2))
 
-    # Fallback: try extracting first number like 25000
+    # Range: 50K-100K
+    m = re.match(r"^([0-9]+(?:\.[0-9]+)?)([KMB])\-([0-9]+(?:\.[0-9]+)?)([KMB])$", s, re.IGNORECASE)
+    if m:
+        return _to_usd(float(m.group(1)), m.group(2))
+
+    # Fallback: first numeric token
     m = re.search(r"([0-9][0-9,]*)", s)
     if m:
         try:
@@ -84,7 +90,14 @@ def _parse_date(s: str) -> date | None:
     if not s:
         return None
     s = s.strip()
-    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%b %d, %Y", "%B %d, %Y"):
+    for fmt in (
+        "%m/%d/%Y",
+        "%Y-%m-%d",
+        "%b %d, %Y",
+        "%B %d, %Y",
+        "%d %b %Y",   # e.g., 15 Apr 2026
+        "%d %B %Y",   # e.g., 15 April 2026
+    ):
         try:
             return datetime.strptime(s, fmt).date()
         except Exception:
@@ -162,53 +175,92 @@ def fetch_congressional_trades() -> list[dict[str, Any]]:
         if not tds:
             continue
 
-        # Prefer data-label attributes when present.
-        labeled: dict[str, str] = {}
-        for td in tds:
-            label = (td.get("data-label") or "").strip().lower()
-            if label:
-                labeled[label] = td.get_text(" ", strip=True)
-
-        def get_by_label(*names: str) -> str:
+        def _idx(*names: str, default: int | None = None) -> int | None:
             for n in names:
-                v = labeled.get(n.lower())
-                if v:
-                    return v
-            return ""
+                k = n.lower()
+                if k in header_map:
+                    return header_map[k]
+            return default
 
-        # Heuristic fallbacks by column index.
-        politician = get_by_label("politician", "trader", "member") or (tds[0].get_text(" ", strip=True) if len(tds) > 0 else "")
-        ticker = get_by_label("ticker", "symbol")
-        company = get_by_label("company", "issuer")
-        trade_type = get_by_label("type", "transaction")
-        trade_date_s = get_by_label("traded", "trade date", "transaction date")
-        report_date_s = get_by_label("reported", "report date", "published")
-        amount_range = get_by_label("size", "amount", "range")
+        def _td(i: int | None):
+            if i is None or i < 0 or i >= len(tds):
+                return None
+            return tds[i]
 
-        if not ticker and len(tds) > 1:
-            # Try to find an all-caps ticker substring.
-            txt = tds[1].get_text(" ", strip=True)
-            m = re.search(r"\b[A-Z]{1,5}\b", txt)
-            if m:
-                ticker = m.group(0)
+        # Column indices based on table header labels.
+        pol_i = _idx("politician", default=0)
+        issuer_i = _idx("traded issuer", default=1)
+        published_i = _idx("published", default=2)
+        traded_i = _idx("traded", default=3)
+        type_i = _idx("type", default=6)
+        size_i = _idx("size", default=7)
 
+        pol_td = _td(pol_i)
+        issuer_td = _td(issuer_i)
+        published_td = _td(published_i)
+        traded_td = _td(traded_i)
+        type_td = _td(type_i)
+        size_td = _td(size_i)
+
+        politician = ""
+        party = "?"
+        chamber = "?"
+
+        if pol_td is not None:
+            a = pol_td.find("a")
+            politician = a.get_text(" ", strip=True) if a else pol_td.get_text(" ", strip=True)
+
+            party_txt = ""
+            party_span = pol_td.select_one(".party")
+            if party_span:
+                party_txt = party_span.get_text(" ", strip=True)
+            else:
+                party_txt = pol_td.get_text(" ", strip=True)
+
+            p_l = party_txt.lower()
+            if "republic" in p_l:
+                party = "R"
+            elif "democrat" in p_l:
+                party = "D"
+            elif "independ" in p_l:
+                party = "I"
+
+            chamber_span = pol_td.select_one(".chamber")
+            if chamber_span:
+                chamber = chamber_span.get_text(" ", strip=True) or chamber
+            else:
+                ttxt = pol_td.get_text(" ", strip=True).lower()
+                if "senate" in ttxt:
+                    chamber = "Senate"
+                elif "house" in ttxt:
+                    chamber = "House"
+
+        ticker = ""
+        company = ""
+        if issuer_td is not None:
+            comp_a = issuer_td.find("a")
+            if comp_a:
+                company = comp_a.get_text(" ", strip=True)
+            tick_span = issuer_td.select_one(".issuer-ticker")
+            if tick_span:
+                ticker = tick_span.get_text(" ", strip=True)
+            else:
+                txt = issuer_td.get_text(" ", strip=True)
+                m = re.search(r"\b[A-Z]{1,5}(?::[A-Z]{2})?\b", txt)
+                if m:
+                    ticker = m.group(0)
+
+        if ":" in ticker:
+            ticker = ticker.split(":", 1)[0]
+
+        ticker = ticker.strip().upper()
         if not ticker:
             continue
 
-        # Party and chamber are often in the politician cell.
-        party = ""
-        chamber = ""
-        pol_txt = politician
-        if re.search(r"\bSen\.?\b", pol_txt, re.IGNORECASE):
-            chamber = "Senate"
-        elif re.search(r"\bRep\.?\b", pol_txt, re.IGNORECASE):
-            chamber = "House"
+        trade_type = ""
+        if type_td is not None:
+            trade_type = type_td.get_text(" ", strip=True)
 
-        m_party = re.search(r"\(([DRI])\)", pol_txt)
-        if m_party:
-            party = m_party.group(1)
-
-        # Normalize trade type
         trade_type_norm = ""
         if trade_type:
             if "buy" in trade_type.lower():
@@ -217,6 +269,25 @@ def fetch_congressional_trades() -> list[dict[str, Any]]:
                 trade_type_norm = "Sell"
             else:
                 trade_type_norm = trade_type.strip()
+
+        amount_range = ""
+        if size_td is not None:
+            size_txt = size_td.get_text(" ", strip=True)
+            # Extract the range token (e.g., 1K–15K)
+            m = re.search(r"([0-9]+(?:\.[0-9]+)?[KMB]\s*[–\-]\s*[0-9]+(?:\.[0-9]+)?[KMB]|[0-9]+(?:\.[0-9]+)?[KMB]\+?)", size_txt, re.IGNORECASE)
+            amount_range = (m.group(1) if m else size_txt).strip()
+
+        trade_date_s = traded_td.get_text(" ", strip=True) if traded_td is not None else ""
+
+        report_date_s = ""
+        if published_td is not None:
+            pub_txt = published_td.get_text(" ", strip=True)
+            if re.search(r"\btoday\b", pub_txt, re.IGNORECASE):
+                report_date_s = _now_et().date().strftime("%Y-%m-%d")
+            elif re.search(r"\byesterday\b", pub_txt, re.IGNORECASE):
+                report_date_s = (_now_et().date() - timedelta(days=1)).strftime("%Y-%m-%d")
+            else:
+                report_date_s = pub_txt
 
         trade_date = _parse_date(trade_date_s)
         report_date = _parse_date(report_date_s)
