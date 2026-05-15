@@ -8,7 +8,7 @@ from typing import Any
 from anthropic import Anthropic
 
 
-DEFAULT_MODEL = "claude-sonnet-4-5-20251001"  # Requested by spec
+DEFAULT_MODEL = "claude-sonnet-4-6"  # Use exactly this model id
 
 
 def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
@@ -27,7 +27,7 @@ def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
         print("WARNING: ANTHROPIC_API_KEY is not set; skipping analysis.", file=sys.stderr)
         return "Analysis unavailable at this time."
 
-    model = os.getenv("ANTHROPIC_MODEL", DEFAULT_MODEL)
+    model = DEFAULT_MODEL
 
     if report_type == "pre-market":
         system_prompt = (
@@ -81,5 +81,39 @@ def generate_analysis(market_data: dict[str, Any], report_type: str) -> str:
 
         return str(text).strip()
     except Exception as exc:
-        print(f"WARNING: Claude API call failed: {exc}", file=sys.stderr)
+        # Log the real error details for debugging in GitHub Actions logs.
+        print("ERROR: Claude API call failed.", file=sys.stderr)
+        print(f"ERROR_TYPE: {type(exc).__name__}", file=sys.stderr)
+        print(f"ERROR_MESSAGE: {exc}", file=sys.stderr)
+
+        status_code = getattr(exc, "status_code", None)
+        if status_code is not None:
+            print(f"HTTP_STATUS: {status_code}", file=sys.stderr)
+
+        request_id = getattr(exc, "request_id", None)
+        if request_id:
+            print(f"REQUEST_ID: {request_id}", file=sys.stderr)
+
+        body = getattr(exc, "body", None)
+        if body is not None:
+            try:
+                print("ERROR_BODY:", json.dumps(body, indent=2, default=str)[:8000], file=sys.stderr)
+            except Exception:
+                print(f"ERROR_BODY: {body}", file=sys.stderr)
+
+        response = getattr(exc, "response", None)
+        if response is not None:
+            # Avoid dumping request headers; just summarize response if possible.
+            try:
+                resp_status = getattr(response, "status_code", None)
+                if resp_status is not None:
+                    print(f"RESPONSE_STATUS: {resp_status}", file=sys.stderr)
+                resp_text = None
+                if hasattr(response, "text"):
+                    resp_text = response.text
+                if resp_text:
+                    print("RESPONSE_TEXT:", str(resp_text)[:8000], file=sys.stderr)
+            except Exception:
+                print(f"RESPONSE: {response}", file=sys.stderr)
+
         return "Analysis unavailable at this time."
