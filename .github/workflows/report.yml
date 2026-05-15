@@ -11,9 +11,9 @@ on:
     # Pre-market: 8:45 AM ET -> 12:45 UTC (EDT) or 13:45 UTC (EST)
     - cron: '45 12 * * 1-5'
     - cron: '45 13 * * 1-5'
-    # Post-market: 4:15 PM ET -> 20:15 UTC (EDT) or 21:15 UTC (EST)
-    - cron: '15 20 * * 1-5'
-    - cron: '15 21 * * 1-5'
+    # Post-market (TEMP TEST): 5:13 PM ET -> 21:13 UTC (EDT) or 22:13 UTC (EST)
+    - cron: '13 21 * * 1-5'
+    - cron: '13 22 * * 1-5'
   workflow_dispatch:
 
 jobs:
