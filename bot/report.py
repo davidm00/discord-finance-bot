@@ -29,6 +29,15 @@ from recommendation_parser import parse_recommendations
 ET_TZ = pytz.timezone("America/New_York")
 
 
+def _ensure_utf8_console() -> None:
+    # Windows PowerShell can default to cp1252 and crash on emoji output.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def _load_env_local() -> None:
     """Load repo-root .env.local for local testing (gitignored).
 
@@ -149,6 +158,8 @@ def _write_local_full_analysis(analysis: str) -> str | None:
 
 
 def main() -> int:
+    _ensure_utf8_console()
+
     start = time.monotonic()
 
     _load_env_local()

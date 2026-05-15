@@ -9,6 +9,11 @@ CONFIDENCE = {"HIGH", "MEDIUM", "LOW"}
 
 
 def parse_recommendations(text: str):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     print("[parser] Parsing ticker recommendations from Claude response...")
 
     try:
