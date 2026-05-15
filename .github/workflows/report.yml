@@ -5,10 +5,12 @@ env:
 
 on:
   schedule:
-    - cron: '45 8 * * 1-5'
-      timezone: America/New_York
-    - cron: '15 16 * * 1-5'
-      timezone: America/New_York
+    # GitHub Actions cron uses UTC.
+    # 8:45 AM ET = 12:45 UTC during EDT (summer) and 13:45 UTC during EST (winter).
+    # 4:15 PM ET = 20:15 UTC during EDT and 21:15 UTC during EST.
+    # We bias to current EDT (UTC-4). If you want winter-correct scheduling too, we can add seasonal schedules.
+    - cron: '45 12 * * 1-5'
+    - cron: '15 20 * * 1-5'
   workflow_dispatch:
 
 jobs:
