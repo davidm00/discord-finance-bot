@@ -17,33 +17,96 @@ THEMATIC_WATCHLIST = {
 
 WATCHLIST_TICKERS = {t for lst in THEMATIC_WATCHLIST.values() for t in lst}
 
-# Simple "major tickers" set to approximate S&P 500 membership (not exhaustive).
-MAJOR_SP500_TICKERS = {
-    "AAPL",
-    "MSFT",
-    "AMZN",
-    "GOOGL",
-    "META",
-    "NVDA",
-    "AMD",
-    "TSLA",
+MAJOR_TICKERS = {
+    # Index / market proxies
+    "SPY",
+    "QQQ",
+    "DIA",
+
+    # Financials
     "JPM",
     "BAC",
-    "WMT",
-    "COST",
-    "UNH",
-    "LLY",
-    "XOM",
-    "CVX",
+    "GS",
+    "MS",
+    "WFC",
+    "C",
     "BRK.B",
-    "BRK.A",
     "V",
     "MA",
-    "AVGO",
-    "ORCL",
+    "PYPL",
+
+    # Retail / consumer
+    "HD",
+    "WMT",
+    "TGT",
+    "COST",
+    "MCD",
+    "SBUX",
+    "NKE",
+
+    # Media / internet / mega-cap
+    "DIS",
     "NFLX",
-    "ADBE",
+    "TSLA",
+    "UBER",
+    "LYFT",
+    "ABNB",
+
+    # Enterprise / semis / cloud
     "CRM",
+    "ORCL",
+    "IBM",
+    "INTC",
+    "QCOM",
+    "TXN",
+    "MU",
+    "AVGO",
+    "NOW",
+    "SNOW",
+
+    # Momentum / meme-ish / fintech
+    "PLTR",
+    "COIN",
+    "HOOD",
+    "RBLX",
+    "SHOP",
+    "SQ",
+    "ROKU",
+    "ZM",
+    "DOCU",
+    "TWLO",
+    "NET",
+    "DDOG",
+
+    # Healthcare
+    "PFE",
+    "JNJ",
+    "MRNA",
+    "ABBV",
+    "LLY",
+    "UNH",
+    "CVS",
+    "WBA",
+
+    # Industrials / defense
+    "BA",
+    "CAT",
+    "DE",
+    "MMM",
+    "GE",
+    "HON",
+    "RTX",
+    "LMT",
+    "NOC",
+
+    # Energy
+    "XOM",
+    "CVX",
+    "COP",
+    "OXY",
+    "MPC",
+    "PSX",
+    "VLO",
 }
 
 
@@ -102,14 +165,21 @@ def fetch_upcoming_earnings() -> list[dict[str, Any]]:
             eps_est = r.get("epsEstimate")
             eps_est_f = float(eps_est) if eps_est is not None else None
 
-            # Relevance filter:
-            # - Always include thematic watchlist tickers
-            # - Otherwise include any company with an EPS estimate (broad but useful)
-            relevant = sym in WATCHLIST_TICKERS or (eps_est_f is not None)
+            # Relevance criteria (include if ANY pass):
+            # 1) The symbol is in the thematic watchlist
+            # 2) The symbol is in our hardcoded major tickers list
+            # 3) EPS estimate exists and abs(EPS) > 0.10
+            passes_watchlist = sym in WATCHLIST_TICKERS
+            passes_major = sym in MAJOR_TICKERS
+            passes_eps = eps_est_f is not None and abs(float(eps_est_f)) > 0.10
+
+            relevant = passes_watchlist or passes_major or passes_eps
             if not relevant:
                 continue
 
-            score = 2 if sym in WATCHLIST_TICKERS else (1 if sym in MAJOR_SP500_TICKERS else 0)
+            # Prioritize watchlist + major tickers over EPS-only names.
+            score = 3 if passes_watchlist else (2 if passes_major else 1)
+            abs_eps = abs(float(eps_est_f)) if eps_est_f is not None else 0.0
 
             out.append(
                 {
@@ -119,17 +189,40 @@ def fetch_upcoming_earnings() -> list[dict[str, Any]]:
                     "time": time,
                     "eps_estimate": eps_est_f,
                     "_score": score,
+                    "_abs_eps": abs_eps,
+                    "_passes_watchlist": passes_watchlist,
+                    "_passes_major": passes_major,
+                    "_passes_eps": passes_eps,
                 }
             )
         except Exception:
             continue
 
-    # Prefer watchlist/major tickers, then sort by date then symbol
-    out.sort(key=lambda x: (-(x.get("_score") or 0), x.get("date") or "", x.get("symbol") or ""))
+    # Prefer watchlist/major tickers first; within EPS-only, prefer bigger abs EPS; then by date.
+    out.sort(
+        key=lambda x: (
+            -(x.get("_score") or 0),
+            -(x.get("_abs_eps") or 0.0),
+            x.get("date") or "",
+            x.get("symbol") or "",
+        )
+    )
+
+    # Log match breakdown (cheap, helps tune quickly)
+    watch_ct = sum(1 for x in out if x.get("_passes_watchlist"))
+    major_ct = sum(1 for x in out if x.get("_passes_major"))
+    eps_ct = sum(1 for x in out if x.get("_passes_eps"))
 
     out = out[:5]
     for x in out:
         x.pop("_score", None)
+        x.pop("_abs_eps", None)
+        x.pop("_passes_watchlist", None)
+        x.pop("_passes_major", None)
+        x.pop("_passes_eps", None)
 
+    symbols_sample = [str(x.get("symbol") or "").upper() for x in out if x.get("symbol")]
     print(f"[earnings_fetcher] Filtered to {len(out)} relevant earnings")
+    print(f"[earnings_fetcher] Sample of filtered symbols: {symbols_sample}")
+    print(f"[earnings_fetcher] Matches — watchlist: {watch_ct}, major: {major_ct}, eps(|eps|>0.10): {eps_ct}")
     return out
