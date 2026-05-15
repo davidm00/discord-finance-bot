@@ -36,24 +36,26 @@ def _fetch_daily_series(ticker: str):
 
 
 def fetch_market_data() -> dict[str, Any]:
-    """Fetch equities + crypto market data from yfinance.
+    """Fetch equities market data from yfinance.
 
     Returns a dict shaped like:
     {
-      "equities": { ... },
-      "crypto": { ... },
+      "equities": {
+        "SPY": {"price": float, "prev_close": float, "pct_change": float, "volume": int},
+        ...
+      },
       "fetched_at_et": "YYYY-MM-DD HH:MM ET"
     }
+
+    (Crypto is handled separately via CoinGecko in bot/crypto_data.py.)
     """
 
     now_et = datetime.now(ET_TZ)
     fetched_at_et = now_et.strftime("%Y-%m-%d %H:%M ET")
 
     equities_tickers = ["SPY", "QQQ", "DIA", "^VIX"]
-    crypto_tickers = ["BTC-USD", "ETH-USD", "SOL-USD"]
 
     equities: dict[str, Any] = {}
-    crypto: dict[str, Any] = {}
 
     print("Fetching market data via yfinance...", file=sys.stdout)
 
@@ -95,45 +97,7 @@ def fetch_market_data() -> dict[str, Any]:
             print(f"WARNING: Failed to fetch {tk}: {exc}", file=sys.stderr)
             equities[tk] = None
 
-    for tk in crypto_tickers:
-        try:
-            t, hist = _fetch_daily_series(tk)
-            if hist is None or len(hist) < 2:
-                raise ValueError("Insufficient history")
-
-            prev_close = _safe_float(hist["Close"].iloc[-2])
-            last_close = _safe_float(hist["Close"].iloc[-1])
-            last_vol = _safe_float(hist["Volume"].iloc[-1])
-
-            price = None
-            try:
-                fi = getattr(t, "fast_info", None)
-                if fi:
-                    price = _safe_float(fi.get("last_price"))
-                    if last_vol is None:
-                        last_vol = _safe_float(fi.get("last_volume"))
-            except Exception:
-                price = None
-
-            if price is None:
-                price = last_close
-
-            if prev_close is None or price is None:
-                raise ValueError("Missing price data")
-
-            pct_change = ((price - prev_close) / prev_close) * 100.0
-
-            crypto[tk] = {
-                "price": float(price),
-                "pct_change": float(pct_change),
-                "volume": float(last_vol) if last_vol is not None else 0.0,
-            }
-        except Exception as exc:
-            print(f"WARNING: Failed to fetch {tk}: {exc}", file=sys.stderr)
-            crypto[tk] = None
-
     return {
         "equities": equities,
-        "crypto": crypto,
         "fetched_at_et": fetched_at_et,
     }

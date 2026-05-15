@@ -15,6 +15,7 @@ def generate_analysis(
     market_data: dict[str, Any],
     report_type: str,
     news_items: list[dict[str, str]] | None = None,
+    crypto_data: dict[str, Any] | None = None,
 ) -> str:
     """Generate a 3-paragraph analysis using Anthropic Claude.
 
@@ -22,6 +23,7 @@ def generate_analysis(
       market_data: dict returned from bot/market_data.py
       report_type: "pre-market" or "post-market"
       news_items: list of headline dicts from bot/news_fetcher.py
+      crypto_data: dict returned from bot/crypto_data.py (CoinGecko)
 
     Returns:
       analysis text, or a fallback string if the API call fails.
@@ -44,6 +46,58 @@ def generate_analysis(
         headlines_block = "Recent headlines:\n(no headlines available)"
 
     market_block = f"```json\n{json.dumps(market_data, indent=2, sort_keys=True)}\n```"
+
+    def _arrow(pct: float) -> str:
+        return "▲" if pct >= 0 else "▼"
+
+    def _fmt_price(v: float) -> str:
+        return f"${v:,.2f}"
+
+    def _fmt_vol_usd(v: float) -> str:
+        if v >= 1_000_000_000:
+            return f"${v / 1_000_000_000:,.2f}B"
+        if v >= 1_000_000:
+            return f"${v / 1_000_000:,.2f}M"
+        return f"${v:,.0f}"
+
+    if crypto_data is None:
+        crypto_block = "Crypto data unavailable."
+    else:
+        major = crypto_data.get("major", {}) if isinstance(crypto_data, dict) else {}
+        movers = crypto_data.get("notable_movers", []) if isinstance(crypto_data, dict) else []
+
+        lines: list[str] = ["Crypto market data:"]
+        for sym in ("BTC", "ETH", "SOL"):
+            d = major.get(sym) or {}
+            price = d.get("price")
+            pct = d.get("pct_change_24h")
+            vol = d.get("volume")
+            if price is None or pct is None:
+                lines.append(f"{sym}: n/a")
+                continue
+            vol_str = _fmt_vol_usd(float(vol)) if vol is not None else "n/a"
+            lines.append(
+                f"{sym}: {_fmt_price(float(price))} ({_arrow(float(pct))} {abs(float(pct)):.2f}% 24h) | Vol: {vol_str}"
+            )
+
+        lines.append("")
+        if movers:
+            lines.append("Notable altcoin movers (>=8% move):")
+            for m in movers:
+                ms = str(m.get("symbol") or "").upper()
+                name = str(m.get("name") or "").strip()
+                price = m.get("price")
+                pct = m.get("pct_change_24h")
+                if price is None or pct is None:
+                    continue
+                lines.append(
+                    f"{ms} ({name}): {_fmt_price(float(price))} ({_arrow(float(pct))} {abs(float(pct)):.2f}% 24h)"
+                )
+        else:
+            lines.append("Notable altcoin movers (>=8% move):")
+            lines.append("No notable altcoin movers in top 20.")
+
+        crypto_block = "\n".join(lines)
 
     if report_type == "pre-market":
         system_prompt = (
@@ -76,6 +130,7 @@ def generate_analysis(
         "Market data (JSON):\n"
         f"{market_block}\n\n"
         f"{headlines_block}\n\n"
+        f"{crypto_block}\n\n"
         f"{instruction}"
     )
 

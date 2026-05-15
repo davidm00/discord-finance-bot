@@ -1,10 +1,11 @@
-"""Phase 3: news aggregation + Claude analysis.
+"""Phase 4: enhanced crypto data + news + Claude analysis.
 
-This script fetches basic market data (equities + crypto) and recent market headlines,
-asks Claude for a concise briefing/recap, and posts the result to a Discord webhook on a
-schedule via GitHub Actions.
+This script fetches basic equity market data, enhanced crypto data (CoinGecko), and recent
+market headlines, asks Claude for a concise briefing/recap, and posts the result to a
+Discord webhook on a schedule via GitHub Actions.
 
-Phase 1 was a pipeline test; Phase 2 added market data + AI; Phase 3 adds news context.
+Phase 1 was a pipeline test; Phase 2 added market data + AI; Phase 3 added news; Phase 4
+upgrades crypto via CoinGecko.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import pytz
 import requests
 
 from claude_analysis import generate_analysis
+from crypto_data import fetch_crypto_data
 from market_data import fetch_market_data
 from news_fetcher import fetch_top_headlines
 
@@ -69,7 +71,7 @@ def main() -> int:
         print(f"ERROR: Market data fetch failed: {exc}", file=sys.stderr)
         market_data = None
 
-    if not market_data or _all_none(market_data.get("equities", {})) and _all_none(market_data.get("crypto", {})):
+    if not market_data or _all_none(market_data.get("equities", {})):
         ts = now_et.strftime("%Y-%m-%d %H:%M ET")
         content = f"⚠️ Market data fetch failed at {ts}."
         print("Sending Discord fallback message...", file=sys.stdout)
@@ -84,6 +86,13 @@ def main() -> int:
         print(content)
         return 0
 
+    crypto_data = None
+    try:
+        crypto_data = fetch_crypto_data()
+    except Exception as exc:
+        print(f"WARNING: Crypto fetch failed: {exc}", file=sys.stderr)
+        crypto_data = None
+
     headlines = []
     try:
         headlines = fetch_top_headlines()
@@ -92,13 +101,12 @@ def main() -> int:
         headlines = []
 
     print("Generating Claude analysis...", file=sys.stdout)
-    analysis = generate_analysis(market_data, report_type, headlines)
+    analysis = generate_analysis(market_data, report_type, headlines, crypto_data)
     analysis = (analysis or "Analysis unavailable at this time.").strip()
     if len(analysis) > 4000:
         analysis = analysis[:4000] + "…"
 
     equities = market_data.get("equities", {})
-    crypto = market_data.get("crypto", {})
 
     eq_lines = [
         _fmt_line("SPY", (equities.get("SPY") or {}).get("price") if equities.get("SPY") else None,
@@ -111,14 +119,30 @@ def main() -> int:
                   (equities.get("^VIX") or {}).get("pct_change") if equities.get("^VIX") else None),
     ]
 
-    cr_lines = [
-        _fmt_line("BTC", (crypto.get("BTC-USD") or {}).get("price") if crypto.get("BTC-USD") else None,
-                  (crypto.get("BTC-USD") or {}).get("pct_change") if crypto.get("BTC-USD") else None),
-        _fmt_line("ETH", (crypto.get("ETH-USD") or {}).get("price") if crypto.get("ETH-USD") else None,
-                  (crypto.get("ETH-USD") or {}).get("pct_change") if crypto.get("ETH-USD") else None),
-        _fmt_line("SOL", (crypto.get("SOL-USD") or {}).get("price") if crypto.get("SOL-USD") else None,
-                  (crypto.get("SOL-USD") or {}).get("pct_change") if crypto.get("SOL-USD") else None),
-    ]
+    if crypto_data is None:
+        cr_lines = ["Crypto data unavailable."]
+    else:
+        major = crypto_data.get("major", {}) if isinstance(crypto_data, dict) else {}
+        movers = crypto_data.get("notable_movers", []) if isinstance(crypto_data, dict) else []
+
+        cr_lines = [
+            _fmt_line("BTC", (major.get("BTC") or {}).get("price") if major.get("BTC") else None,
+                      (major.get("BTC") or {}).get("pct_change_24h") if major.get("BTC") else None),
+            _fmt_line("ETH", (major.get("ETH") or {}).get("price") if major.get("ETH") else None,
+                      (major.get("ETH") or {}).get("pct_change_24h") if major.get("ETH") else None),
+            _fmt_line("SOL", (major.get("SOL") or {}).get("price") if major.get("SOL") else None,
+                      (major.get("SOL") or {}).get("pct_change_24h") if major.get("SOL") else None),
+        ]
+
+        if movers:
+            movers_str = ", ".join(
+                f"{m.get('symbol','').upper()} {_arrow(float(m.get('pct_change_24h',0.0)))}{abs(float(m.get('pct_change_24h',0.0))):.2f}%"
+                for m in movers
+                if m.get("symbol") and m.get("pct_change_24h") is not None
+            )
+            if movers_str:
+                cr_lines.append("")
+                cr_lines.append(f"📢 Movers: {movers_str}")
 
     if report_type == "pre-market":
         title = f"📈 Pre-Market Briefing — {date_et} ET"
