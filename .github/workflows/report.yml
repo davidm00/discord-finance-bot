@@ -16,18 +16,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Log job context
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "===== Job context ====="
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Workflow: $GITHUB_WORKFLOW"
+          echo "Run ID: $GITHUB_RUN_ID"
+          echo "Ref: $GITHUB_REF"
+          echo "SHA: $GITHUB_SHA"
+          echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          echo "======================="
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Verify Python
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install requests pytz yfinance anthropic feedparser beautifulsoup4 lxml
+          set -euo pipefail
+          python --version
+          python -m pip --version
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[START] Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          python -m pip install --upgrade pip --disable-pip-version-check
+          pip install --disable-pip-version-check requests pytz yfinance anthropic feedparser beautifulsoup4 lxml
+          echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
       - name: Run report
-        run: python bot/report.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[START] Running report: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          if python bot/report.py; then
+            echo "[OK]    Report succeeded: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
+          else
+            code=$?
+            echo "[FAIL]  Report failed (exit=$code): $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')" >&2
+            exit $code
+          fi
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
