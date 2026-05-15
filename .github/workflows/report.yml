@@ -7,7 +7,7 @@ on:
   schedule:
     # GitHub Actions cron uses UTC (no true timezone/DST support).
     # To handle both EDT and EST automatically, we schedule BOTH possible UTC times.
-    # A guard in bot/report.py ensures only runs near 8:45 AM ET / 4:15 PM ET actually post.
+    # A guard step inside the workflow ensures only the correct season (EDT vs EST) continues.
     # Pre-market: 8:45 AM ET -> 12:45 UTC (EDT) or 13:45 UTC (EST)
     - cron: '45 12 * * 1-5'
     - cron: '45 13 * * 1-5'
@@ -38,31 +38,19 @@ jobs:
             exit 0
           fi
 
-          cron=$(python - <<'PY'
-import json, os
-p=os.environ.get('GITHUB_EVENT_PATH')
-with open(p,'r',encoding='utf-8') as f:
-  d=json.load(f)
-print(d.get('schedule',''))
-PY
-          )
+          cron=$(python3 -c "import json,os;print((json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8')) or {}).get('schedule',''))")
           echo "Triggered cron: $cron"
 
-          # Determine ET offset (EDT=-4, EST=-5)
-          offset=$(python - <<'PY'
-from datetime import datetime, timezone
-import os
-import pytz
-et=pytz.timezone('America/New_York')
-now=datetime.now(timezone.utc).astimezone(et)
-print(int(now.utcoffset().total_seconds()//3600))
-PY
-          )
-          echo "ET UTC offset hours: $offset"
+          # Determine ET offset without extra deps (EDT=-4, EST=-5)
+          z=$(TZ=America/New_York date +%z)
+          case "$z" in
+            "-0400") offset=-4 ;;
+            "-0500") offset=-5 ;;
+            *) offset=0 ;;
+          esac
+          echo "ET UTC offset hours: $offset ($z)"
 
           # Map cron -> expected offset
-          # Pre-market 08:45 ET: 12:45 UTC (EDT=-4) or 13:45 UTC (EST=-5)
-          # Post-market 16:15 ET: 20:15 UTC (EDT=-4) or 21:15 UTC (EST=-5)
           expected=""
           case "$cron" in
             "45 12 * * 1-5") expected=-4 ;;
