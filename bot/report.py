@@ -257,7 +257,7 @@ def _sanitize_embed(embed: dict) -> dict:
     return embed
 
 
-def _within_minutes(now: datetime, hh: int, mm: int, window_min: int = 15) -> bool:
+def _within_minutes(now: datetime, hh: int, mm: int, window_min: int = 30) -> bool:
     target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
     delta = abs((now - target).total_seconds())
     return delta <= window_min * 60
