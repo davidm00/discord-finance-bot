@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 
 ET_TZ = pytz.timezone("America/New_York")
 
-CAPITOL_TRADES_URL = "https://www.capitoltrades.com/trades"
+CAPITOL_TRADES_URL = "https://www.capitoltrades.com/trades?pageSize=96&sortBy=-txDate"
 USASPENDING_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 
 
