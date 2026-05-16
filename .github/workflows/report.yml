@@ -101,6 +101,14 @@ jobs:
           pip install --disable-pip-version-check -r requirements.txt
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
+      - name: Restore signals.csv cache
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/signals.csv
+          key: signals-csv-${{ github.run_id }}
+          restore-keys: signals-csv-
+
       - name: Run report
         if: steps.guard.outputs.should_run == 'true'
         shell: bash
@@ -121,6 +129,13 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+
+      - name: Save signals.csv cache
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/signals.csv
+          key: signals-csv-${{ github.run_id }}
 
   weekly-report:
     runs-on: ubuntu-latest
@@ -177,6 +192,14 @@ jobs:
           pip install --disable-pip-version-check -r requirements.txt
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
+      - name: Restore signals.csv cache
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/signals.csv
+          key: signals-csv-${{ github.run_id }}
+          restore-keys: signals-csv-
+
       - name: Run weekly report
         if: steps.guard.outputs.should_run == 'true'
         shell: bash
@@ -197,3 +220,10 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+
+      - name: Save signals.csv cache
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/signals.csv
+          key: signals-csv-${{ github.run_id }}

@@ -27,6 +27,7 @@ def generate_analysis(
     previous_reports: list[dict[str, Any]] | None,
     earnings: list[dict[str, Any]] | None,
     report_type: str,
+    macro_context: dict[str, Any] | None = None,
 ) -> str:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -279,10 +280,25 @@ def generate_analysis(
 
     sections = [
         "Market data (JSON):\n" + market_block,
-        crypto_block,
-        headlines_block,
-        political_block,
     ]
+
+    # Macro context (TNX, DXY, Fear & Greed) — injected between market data and crypto
+    if macro_context and isinstance(macro_context, dict):
+        macro_lines = ["Macro context:"]
+        if macro_context.get("treasury_10y") is not None:
+            macro_lines.append(f"10-Year Treasury Yield: {macro_context['treasury_10y']}% (higher = pressure on growth stocks)")
+        if macro_context.get("dollar_index") is not None:
+            macro_lines.append(f"US Dollar Index (DXY): {macro_context['dollar_index']} (higher = pressure on commodities/crypto)")
+        if macro_context.get("fear_greed_score") is not None:
+            rating = macro_context.get("fear_greed_rating") or "Unknown"
+            macro_lines.append(f"Fear & Greed Index: {macro_context['fear_greed_score']}/100 — {rating}")
+            macro_lines.append("(0=Extreme Fear, 100=Extreme Greed; contrarian signal — extreme fear = potential buy)")
+        if len(macro_lines) > 1:
+            sections.append("\n".join(macro_lines))
+
+    sections.append(crypto_block)
+    sections.append(headlines_block)
+    sections.append(political_block)
 
     if earnings_block:
         sections.append(earnings_block)
@@ -299,12 +315,30 @@ def generate_analysis(
 
     try:
         client = Anthropic(api_key=api_key)
+
+        print("[claude] Prompt caching enabled on system prompt")
         msg = client.messages.create(
             model=DEFAULT_MODEL,
             max_tokens=1200,
-            system=system_prompt,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": full_prompt}],
         )
+
+        # Log cache usage if available
+        usage = getattr(msg, "usage", None)
+        if usage:
+            cache_creation = getattr(usage, "cache_creation_input_tokens", None)
+            cache_read = getattr(usage, "cache_read_input_tokens", None)
+            if cache_creation is not None:
+                print(f"[claude] cache_creation_input_tokens: {cache_creation}")
+            if cache_read is not None:
+                print(f"[claude] cache_read_input_tokens: {cache_read}")
 
         parts = getattr(msg, "content", None)
         if not parts:

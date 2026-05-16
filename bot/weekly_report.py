@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any
 
@@ -23,9 +24,11 @@ from anthropic import Anthropic
 
 from claude_analysis import DEFAULT_MODEL, DISCLAIMER_LINE
 from history_fetcher import fetch_weekly_history
+from market_data import fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
+from signal_logger import log_recommendations
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -377,12 +380,32 @@ def main() -> int:
         print("[weekly] WARNING: DISCORD_WEBHOOK_URL not set; cannot post.")
         return 0
 
-    weekly_perf: dict[str, dict[str, Any]] = {}
-    try:
-        weekly_perf = fetch_weekly_market_performance()
-    except Exception as exc:
-        print(f"[weekly] WARNING: weekly performance failed: {exc}")
-        weekly_perf = {}
+    print("[weekly] Starting parallel data fetch (4 sources)...")
+    fetch_start = time.monotonic()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(fetch_weekly_market_performance): "weekly_perf",
+            executor.submit(fetch_top_headlines): "headlines",
+            executor.submit(fetch_political_data, 7): "political",
+            executor.submit(fetch_macro_context): "macro",
+        }
+        results: dict[str, any] = {}
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                results[key] = future.result()
+            except Exception as e:
+                print(f"[weekly] WARNING: {key} fetch failed in executor: {e}")
+                results[key] = None
+
+    weekly_perf = results.get("weekly_perf") or {}
+    headlines = results.get("headlines") or []
+    political = results.get("political") or {}
+    macro_context = results.get("macro")
+
+    fetch_elapsed = time.monotonic() - fetch_start
+    print(f"[weekly] All data fetched in {fetch_elapsed:.1f}s")
 
     print("[weekly] Fetching weekly Discord history...")
     weekly_history: list[dict[str, Any]] = []
@@ -392,21 +415,6 @@ def main() -> int:
         print(f"[weekly] WARNING: weekly history fetch failed: {exc}")
         weekly_history = []
     print(f"[weekly] Weekly history: {len(weekly_history)} reports found")
-
-    print("[weekly] Fetching news, political data...")
-    headlines: list[dict[str, Any]] = []
-    try:
-        headlines = fetch_top_headlines()
-    except Exception as exc:
-        print(f"[weekly] WARNING: news fetch failed: {exc}")
-        headlines = []
-
-    political: dict[str, Any] = {}
-    try:
-        political = fetch_political_data(lookback_days=7)
-    except Exception as exc:
-        print(f"[weekly] WARNING: political fetch failed: {exc}")
-        political = {}
 
     api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
@@ -422,6 +430,21 @@ def main() -> int:
 
     print("[weekly] Building Claude prompt...")
     user_prompt = build_weekly_prompt(weekly_perf, weekly_history, headlines, political)
+
+    # Append macro context to user prompt if available
+    if macro_context:
+        macro_lines = ["\nMacro context:"]
+        if macro_context.get("treasury_10y") is not None:
+            macro_lines.append(f"10-Year Treasury Yield: {macro_context['treasury_10y']}% (higher = pressure on growth stocks)")
+        if macro_context.get("dollar_index") is not None:
+            macro_lines.append(f"US Dollar Index (DXY): {macro_context['dollar_index']} (higher = pressure on commodities/crypto)")
+        if macro_context.get("fear_greed_score") is not None:
+            rating = macro_context.get("fear_greed_rating", "Unknown")
+            macro_lines.append(f"Fear & Greed Index: {macro_context['fear_greed_score']}/100 — {rating}")
+            macro_lines.append("(0=Extreme Fear, 100=Extreme Greed; contrarian signal — extreme fear = potential buy)")
+        if len(macro_lines) > 1:
+            user_prompt += "\n" + "\n".join(macro_lines)
+
     print(f"[weekly] Prompt token estimate: ~{len(user_prompt)//4} tokens")
 
     analysis = ""
@@ -432,12 +455,30 @@ def main() -> int:
         try:
             print("[weekly] Calling Claude API...")
             client = Anthropic(api_key=api_key)
+
+            print("[claude] Prompt caching enabled on system prompt")
             msg = client.messages.create(
                 model=DEFAULT_MODEL,
                 max_tokens=1800,
-                system=system_prompt,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
                 messages=[{"role": "user", "content": user_prompt}],
             )
+
+            # Log cache usage if available
+            usage = getattr(msg, "usage", None)
+            if usage:
+                cache_creation = getattr(usage, "cache_creation_input_tokens", None)
+                cache_read = getattr(usage, "cache_read_input_tokens", None)
+                if cache_creation is not None:
+                    print(f"[claude] cache_creation_input_tokens: {cache_creation}")
+                if cache_read is not None:
+                    print(f"[claude] cache_read_input_tokens: {cache_read}")
 
             parts = getattr(msg, "content", None)
             text = getattr(parts[0], "text", None) if parts else None
@@ -460,6 +501,11 @@ def main() -> int:
     except Exception as exc:
         print(f"[weekly] WARNING: parser failed: {exc}")
         recs = []
+
+    # Signal logging
+    if recs:
+        log_recommendations(recs, "weekly")
+        print(f"[weekly] Signal logging complete: {len(recs)} signals logged")
 
     # Monday date for title/footer
     monday_date = ""

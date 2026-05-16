@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 
 ET_TZ = pytz.timezone("America/New_York")
 
-CAPITOL_TRADES_URL = "https://www.capitoltrades.com/trades?pageSize=96&sortBy=-txDate"
+CAPITOL_TRADES_URL = "https://www.capitoltrades.com/trades?pageSize=96&sortBy=-pubDate"
 USASPENDING_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 
 KNOWN_RECURRING_CONTRACTS = [
@@ -310,7 +310,11 @@ def fetch_congressional_trades(lookback_days: int = 7) -> list[dict[str, Any]]:
             # Skip if we can't parse; needed for last-7-days filter.
             continue
 
-        if trade_date < cutoff:
+        # Filter by PUBLISHED date (disclosure date) instead of trade date
+        if report_date and report_date < cutoff:
+            continue
+        elif not report_date and trade_date < cutoff:
+            # Fall back to trade date if published date unavailable
             continue
 
         min_amt = _parse_amount_min(amount_range)
@@ -326,9 +330,11 @@ def fetch_congressional_trades(lookback_days: int = 7) -> list[dict[str, Any]]:
                 "company": company.strip() if company else "",
                 "trade_type": trade_type_norm or "?",
                 "trade_date": trade_date.strftime("%Y-%m-%d"),
+                "published_date": report_date.strftime("%Y-%m-%d") if report_date else "",
                 "report_date": report_date.strftime("%Y-%m-%d") if report_date else "",
                 "amount_range": amount_range.strip() if amount_range else "",
                 "_trade_date": trade_date,
+                "_published_date": report_date,
             }
         )
 
@@ -336,12 +342,22 @@ def fetch_congressional_trades(lookback_days: int = 7) -> list[dict[str, Any]]:
         print("WARNING: No recent trades >= $25K found (or scraping failed).", file=sys.stderr)
         return []
 
-    trades.sort(key=lambda x: x.get("_trade_date") or date.min, reverse=True)
+    # Sort by published/disclosure date descending (most recently disclosed first)
+    print(f"[political] Sorting {len(trades)} trades by published/disclosure date")
+    trades.sort(
+        key=lambda x: x.get("_published_date") or x.get("_trade_date") or date.min,
+        reverse=True,
+    )
+    if trades:
+        top_pub = trades[0].get("published_date") or trades[0].get("trade_date") or "unknown"
+        print(f"[political] Most recent disclosure: {top_pub}")
+
     trades = trades[:15]
 
     # Strip internal fields
     for t in trades:
         t.pop("_trade_date", None)
+        t.pop("_published_date", None)
 
     return trades
 

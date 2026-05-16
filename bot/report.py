@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import pytz
@@ -20,10 +21,11 @@ from claude_analysis import DISCLAIMER_LINE, generate_analysis
 from crypto_data import fetch_crypto_data
 from earnings_fetcher import fetch_upcoming_earnings
 from history_fetcher import fetch_previous_reports
-from market_data import fetch_market_data
+from market_data import fetch_market_data, fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
+from signal_logger import log_recommendations
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -286,22 +288,36 @@ def main() -> int:
         previous_reports = []
     print(f"[report] Previous reports found: {len(previous_reports)}")
 
-    print("[report] Fetching earnings calendar...")
-    earnings = []
-    try:
-        earnings = fetch_upcoming_earnings()
-    except Exception as exc:
-        print(f"[report] WARNING: earnings fetch failed: {exc}")
-        earnings = []
-    print(f"[report] Earnings found: {len(earnings)}")
+    print("[report] Starting parallel data fetch (6 sources)...")
+    fetch_start = time.monotonic()
 
-    print("[report] Fetching market data...")
-    market_data = None
-    try:
-        market_data = fetch_market_data()
-    except Exception as exc:
-        print(f"[report] WARNING: market data fetch failed: {exc}")
-        market_data = None
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(fetch_upcoming_earnings): "earnings",
+            executor.submit(fetch_market_data): "market",
+            executor.submit(fetch_crypto_data): "crypto",
+            executor.submit(fetch_top_headlines): "news",
+            executor.submit(fetch_political_data): "political",
+            executor.submit(fetch_macro_context): "macro",
+        }
+        results: dict[str, any] = {}
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                results[key] = future.result()
+            except Exception as e:
+                print(f"[report] WARNING: {key} fetch failed in executor: {e}")
+                results[key] = None
+
+    earnings = results.get("earnings") or []
+    market_data = results.get("market")
+    crypto_data = results.get("crypto")
+    headlines = results.get("news") or []
+    political_data = results.get("political") or {}
+    macro_context = results.get("macro")
+
+    fetch_elapsed = time.monotonic() - fetch_start
+    print(f"[report] All data fetched in {fetch_elapsed:.1f}s")
 
     if not market_data or _all_none(market_data.get("equities", {})):
         ts = now_et.strftime("%Y-%m-%d %H:%M ET")
@@ -318,30 +334,6 @@ def main() -> int:
         print(content)
         return 0
 
-    print("[report] Fetching crypto data...")
-    crypto_data = None
-    try:
-        crypto_data = fetch_crypto_data()
-    except Exception as exc:
-        print(f"[report] WARNING: crypto fetch failed: {exc}")
-        crypto_data = None
-
-    print("[report] Fetching news...")
-    headlines = []
-    try:
-        headlines = fetch_top_headlines()
-    except Exception as exc:
-        print(f"[report] WARNING: news fetch failed: {exc}")
-        headlines = []
-
-    print("[report] Fetching political data...")
-    political_data = {}
-    try:
-        political_data = fetch_political_data()
-    except Exception as exc:
-        print(f"[report] WARNING: political data fetch failed: {exc}")
-        political_data = {}
-
     print("[report] All data fetched. Starting Claude analysis...")
     analysis = generate_analysis(
         market_data=market_data,
@@ -351,6 +343,7 @@ def main() -> int:
         previous_reports=previous_reports,
         earnings=earnings,
         report_type=report_type,
+        macro_context=macro_context,
     )
 
     analysis = _enforce_disclaimer(analysis)
@@ -359,6 +352,11 @@ def main() -> int:
     print("[report] Parsing ticker recommendations...")
     recs = parse_recommendations(analysis)
     print(f"[report] Recommendations parsed: {len(recs)}")
+
+    # Signal logging
+    if recs:
+        log_recommendations(recs, report_type)
+        print(f"[report] Signal logging complete: {len(recs)} signals logged")
 
     equities = market_data.get("equities", {})
 
@@ -416,7 +414,7 @@ def main() -> int:
 
     if trades:
         trade_lines = [
-            f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} ${str(t.get('ticker','')).upper()} | {t.get('amount_range','').strip()} | {t.get('trade_date','').strip()}"
+            f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} ${str(t.get('ticker','')).upper()} | {t.get('amount_range','').strip()} | published: {t.get('published_date','') or t.get('trade_date','').strip()}"
             for t in trades[:5]
         ]
         trades_value = "\n".join(trade_lines) if trade_lines else "No recent trades above $25K."

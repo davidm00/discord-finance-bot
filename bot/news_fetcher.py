@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -191,6 +193,37 @@ def fetch_top_headlines() -> list[dict[str, str]]:
         dedup[url] = it
 
     items = list(dedup.values())
+
+    # Headline content deduplication (same story from multiple sources)
+    total_before = len(items)
+    print(f"[news] Total headlines before dedup: {total_before}")
+
+    seen_hashes: dict[str, dict[str, Any]] = {}
+    deduped_items: list[dict[str, Any]] = []
+    for it in items:
+        headline_text = str(it.get("headline") or "").lower().strip()
+        normalized = re.sub(r'[^a-z0-9 ]', '', headline_text)
+        key = hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+        if key in seen_hashes:
+            # Keep earlier published (first-to-report preferred)
+            existing = seen_hashes[key]
+            existing_dt = existing.get("published_dt") or datetime.max.replace(tzinfo=ET_TZ)
+            current_dt = it.get("published_dt") or datetime.max.replace(tzinfo=ET_TZ)
+            if current_dt < existing_dt:
+                # Replace with earlier source
+                deduped_items = [x for x in deduped_items if x is not existing]
+                deduped_items.append(it)
+                seen_hashes[key] = it
+        else:
+            seen_hashes[key] = it
+            deduped_items.append(it)
+
+    duplicates_removed = total_before - len(deduped_items)
+    print(f"[news] Duplicates removed: {duplicates_removed}")
+    print(f"[news] Headlines after dedup: {len(deduped_items)}")
+
+    items = deduped_items
 
     # Sort by published_dt descending.
     items.sort(key=lambda x: x.get("published_dt") or datetime.min.replace(tzinfo=ET_TZ), reverse=True)

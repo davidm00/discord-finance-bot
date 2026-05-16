@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 import pytz
+import requests
 import yfinance as yf
 
 
@@ -101,3 +102,64 @@ def fetch_market_data() -> dict[str, Any]:
         "equities": equities,
         "fetched_at_et": fetched_at_et,
     }
+
+
+def fetch_macro_context() -> dict[str, Any]:
+    """Fetch macro context: 10Y Treasury yield, DXY, Fear & Greed Index.
+
+    Each field is fetched independently — if one fails, the others still return.
+    """
+    print("[market] Fetching macro context (TNX, DXY, Fear & Greed)...")
+
+    result: dict[str, Any] = {
+        "treasury_10y": None,
+        "dollar_index": None,
+        "fear_greed_score": None,
+        "fear_greed_rating": None,
+    }
+
+    # 10-Year Treasury Yield (^TNX)
+    try:
+        tnx = yf.Ticker("^TNX")
+        hist = tnx.history(period="2d")
+        if hist is not None and not hist.empty:
+            result["treasury_10y"] = round(float(hist["Close"].iloc[-1]), 2)
+    except Exception as exc:
+        print(f"[market] WARNING: TNX fetch failed — {exc}")
+
+    # US Dollar Index (DX-Y.NYB)
+    try:
+        dxy = yf.Ticker("DX-Y.NYB")
+        hist = dxy.history(period="2d")
+        if hist is not None and not hist.empty:
+            result["dollar_index"] = round(float(hist["Close"].iloc[-1]), 2)
+    except Exception as exc:
+        print(f"[market] WARNING: DXY fetch failed — {exc}")
+
+    # CNN Fear & Greed Index
+    try:
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        resp = requests.get(
+            url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        if 200 <= resp.status_code < 300:
+            data = resp.json()
+            fg = data.get("fear_and_greed") or {}
+            score = fg.get("score")
+            rating = fg.get("rating")
+            if score is not None:
+                result["fear_greed_score"] = int(round(float(score)))
+            if rating:
+                result["fear_greed_rating"] = str(rating)
+    except Exception as exc:
+        print(f"[market] WARNING: Fear & Greed fetch failed — {exc}")
+
+    # Log results
+    tnx_str = f"{result['treasury_10y']}%" if result["treasury_10y"] is not None else "N/A"
+    dxy_str = str(result["dollar_index"]) if result["dollar_index"] is not None else "N/A"
+    fg_str = f"{result['fear_greed_score']} ({result['fear_greed_rating']})" if result["fear_greed_score"] is not None else "N/A"
+    print(f"[market] TNX: {tnx_str} | DXY: {dxy_str} | Fear & Greed: {fg_str}")
+
+    return result
