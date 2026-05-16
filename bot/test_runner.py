@@ -38,6 +38,30 @@ import pytz
 ET_TZ = pytz.timezone("America/New_York")
 
 
+def _load_env_local() -> None:
+    """Load .env.local from repo root for local testing."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    path = os.path.join(repo_root, ".env.local")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = val
+        print("[test] Loaded .env.local")
+    except Exception:
+        pass
+
+
 class TestRunner:
     """Tracks test results and prints summary."""
 
@@ -534,6 +558,9 @@ Confidence: Medium-High
 
 def run_live_tests() -> int:
     """Run live API connectivity tests."""
+    # Load .env.local for API keys
+    _load_env_local()
+
     runner = TestRunner("LIVE")
     print("\n[test] Running LIVE mode tests (real API calls)...\n")
 
@@ -693,6 +720,12 @@ def run_live_tests() -> int:
 # ============================================================
 
 def main():
+    # Ensure UTF-8 output on Windows
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     test_mock = os.getenv("TEST_MOCK", "").strip().lower() in {"1", "true", "yes"}
     test_live = os.getenv("TEST_LIVE", "").strip().lower() in {"1", "true", "yes"}
 
