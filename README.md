@@ -20,7 +20,7 @@ All timestamps are labeled **ET** (Eastern Time). The report always includes a d
 
 ## Weekly Summary Report
 
-Every Saturday at 9:00 AM ET, the bot posts a weekly wrap-up including:
+Every Saturday at 8:00 AM ET, the bot posts a weekly wrap-up including:
 
 - Weekly performance for SPY, QQQ, DIA, VIX, BTC, ETH, SOL
   (Monday open → Friday close with weekly high/low)
@@ -33,15 +33,19 @@ Every Saturday at 9:00 AM ET, the bot posts a weekly wrap-up including:
 
 The weekly report reads all daily reports posted that week via Discord history to build continuity and score previous calls.
 
-## How it runs (GitHub Actions)
+## How it runs
 
 Workflow: `.github/workflows/report.yml`
 
-Triggers:
-- **schedule**: 8:45 AM ET and 4:15 PM ET (Mon–Fri)
-  - Note: GitHub Actions cron is **UTC** and doesn't support DST properly.
-  - This repo schedules **both** the EDT and EST UTC equivalents and uses a workflow-level guard step so only the correct season (EDT vs EST) runs.
-- **workflow_dispatch**: manual runs from the Actions tab
+Scheduling is handled by **cron-job.org** (external cron service, free) which triggers GitHub Actions via `workflow_dispatch`:
+
+- **Pre-market**: 8:00 AM ET, Monday–Friday
+- **Post-market**: 4:15 PM ET, Monday–Friday
+- **Weekly summary**: 8:00 AM ET, Saturday
+
+The workflow accepts a `report_type` input (`daily` or `weekly`) to route between the daily report (`bot/report.py`) and weekly report (`bot/weekly_report.py`).
+
+Manual runs are also supported from the GitHub Actions tab via `workflow_dispatch`.
 
 The workflow installs dependencies from `requirements.txt` and caches pip (`~/.cache/pip`) between runs.
 
