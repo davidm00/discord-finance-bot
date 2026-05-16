@@ -23,8 +23,8 @@ on:
 
   workflow_dispatch:
     inputs:
-      report_kind:
-        description: "Which report to run"
+      report_type:
+        description: "Which report to run (daily or weekly)"
         required: false
         default: "daily"
         type: choice
@@ -54,8 +54,8 @@ jobs:
 
           # --- Routing: only run for daily-related events ---
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_kind','daily'))")
-            echo "Dispatch report_kind: $kind"
+            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_type','daily'))")
+            echo "Dispatch report_type: $kind"
             if [ "$kind" = "daily" ] || [ "$kind" = "" ]; then
               echo "Dispatch targets daily; allowing run."
               echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -203,8 +203,8 @@ jobs:
 
           # --- Routing: only run for weekly-related events ---
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_kind','daily'))")
-            echo "Dispatch report_kind: $kind"
+            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_type','daily'))")
+            echo "Dispatch report_type: $kind"
             if [ "$kind" = "weekly" ]; then
               echo "Dispatch targets weekly; allowing run."
               echo "should_run=true" >> "$GITHUB_OUTPUT"
