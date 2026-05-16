@@ -137,6 +137,22 @@ jobs:
           path: data/signals.csv
           key: signals-csv-${{ github.run_id }}
 
+      - name: Upload signals CSV as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signals-csv-${{ github.run_number }}
+          path: data/signals.csv
+          retention-days: 90
+
+      - name: Upload signals CSV as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signals-csv-${{ github.run_number }}
+          path: data/signals.csv
+          retention-days: 90
+
   weekly-report:
     runs-on: ubuntu-latest
 

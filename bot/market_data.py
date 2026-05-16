@@ -136,25 +136,50 @@ def fetch_macro_context() -> dict[str, Any]:
     except Exception as exc:
         print(f"[market] WARNING: DXY fetch failed — {exc}")
 
-    # CNN Fear & Greed Index
-    try:
-        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        resp = requests.get(
-            url,
-            timeout=10,
-            headers={"User-Agent": "Mozilla/5.0"},
-        )
-        if 200 <= resp.status_code < 300:
-            data = resp.json()
-            fg = data.get("fear_and_greed") or {}
-            score = fg.get("score")
-            rating = fg.get("rating")
-            if score is not None:
-                result["fear_greed_score"] = int(round(float(score)))
-            if rating:
-                result["fear_greed_rating"] = str(rating)
-    except Exception as exc:
-        print(f"[market] WARNING: Fear & Greed fetch failed — {exc}")
+    # Fear & Greed Index — try multiple endpoints
+    fg_found = False
+
+    # Endpoint 1: CNN
+    if not fg_found:
+        try:
+            url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+            resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            if 200 <= resp.status_code < 300:
+                data = resp.json()
+                fg = data.get("fear_and_greed") or {}
+                score = fg.get("score")
+                rating = fg.get("rating")
+                if score is not None:
+                    result["fear_greed_score"] = int(round(float(score)))
+                    result["fear_greed_rating"] = str(rating) if rating else "Unknown"
+                    fg_found = True
+                    print(f"[market] Fear & Greed source: CNN — score {result['fear_greed_score']} ({result['fear_greed_rating']})")
+        except Exception as exc:
+            print(f"[market] WARNING: Fear & Greed CNN failed — {exc}, trying next...")
+
+    # Endpoint 2: Alternative.me (crypto fear & greed)
+    if not fg_found:
+        try:
+            url = "https://api.alternative.me/fng/?limit=1"
+            resp = requests.get(url, timeout=10)
+            if 200 <= resp.status_code < 300:
+                data = resp.json()
+                items = data.get("data") or []
+                if items:
+                    score = int(items[0].get("value", 0))
+                    rating = items[0].get("value_classification", "Unknown")
+                    result["fear_greed_score"] = score
+                    result["fear_greed_rating"] = str(rating)
+                    fg_found = True
+                    print(f"[market] Fear & Greed source: Alternative.me — score {score} ({rating})")
+        except Exception as exc:
+            print(f"[market] WARNING: Fear & Greed Alternative.me failed — {exc}, trying next...")
+
+    # Endpoint 3: Fallback neutral
+    if not fg_found:
+        result["fear_greed_score"] = 50
+        result["fear_greed_rating"] = "Neutral (unavailable)"
+        print("[market] Fear & Greed source: fallback — score 50 (Neutral (unavailable))")
 
     # Log results
     tnx_str = f"{result['treasury_10y']}%" if result["treasury_10y"] is not None else "N/A"
