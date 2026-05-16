@@ -38,38 +38,57 @@ on:
 
 jobs:
   report:
-    if: ${{
-      (github.event_name == 'schedule' && (
-        github.event.schedule == '0 12 * * 1-5' ||
-        github.event.schedule == '0 13 * * 1-5' ||
-        github.event.schedule == '15 20 * * 1-5' ||
-        github.event.schedule == '15 21 * * 1-5'
-      )) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.report_kind == '' || github.event.inputs.report_kind == 'daily'))
-    }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Schedule guard (EDT/EST)
+      - name: Route and guard (daily)
         id: guard
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== Schedule guard (daily) ====="
+          echo "===== Route and guard (daily) ====="
           echo "Event: $GITHUB_EVENT_NAME"
           echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
-          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
-            echo "Non-schedule event; allowing run."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          # --- Routing: only run for daily-related events ---
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_kind','daily'))")
+            echo "Dispatch report_kind: $kind"
+            if [ "$kind" = "daily" ] || [ "$kind" = "" ]; then
+              echo "Dispatch targets daily; allowing run."
+              echo "should_run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Dispatch targets '$kind', not daily; skipping."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
 
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
+            echo "Event is '$GITHUB_EVENT_NAME' (not schedule/dispatch); skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # --- Schedule event: check if this cron belongs to daily ---
           cron=$(python3 -c "import json,os;print((json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8')) or {}).get('schedule',''))")
           echo "Triggered cron: $cron"
 
+          # Daily crons only (skip weekly crons)
+          case "$cron" in
+            "0 12 * * 1-5"|"0 13 * * 1-5"|"15 20 * * 1-5"|"15 21 * * 1-5")
+              echo "Cron matches daily schedule."
+              ;;
+            *)
+              echo "Cron '$cron' is not a daily cron; skipping."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # --- EDT/EST guard ---
           z=$(TZ=America/New_York date +%z)
           case "$z" in
             "-0400") offset=-4 ;;
@@ -84,20 +103,13 @@ jobs:
             "0 13 * * 1-5") expected=-5 ;;
             "15 20 * * 1-5") expected=-4 ;;
             "15 21 * * 1-5") expected=-5 ;;
-            *) expected="" ;;
           esac
-
-          if [ -z "$expected" ]; then
-            echo "Unknown cron; allowing run (fail-open)."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           if [ "$offset" = "$expected" ]; then
             echo "Offset matches expected; allowing run."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Offset mismatch; skipping run." >&2
+            echo "Offset mismatch; skipping run."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -175,36 +187,57 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
 
   weekly-report:
-    if: ${{
-      (github.event_name == 'schedule' && (
-        github.event.schedule == '0 12 * * 6' ||
-        github.event.schedule == '0 13 * * 6'
-      )) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.report_kind == 'weekly')
-    }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Schedule guard (EDT/EST)
+      - name: Route and guard (weekly)
         id: guard
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== Schedule guard (weekly) ====="
+          echo "===== Route and guard (weekly) ====="
           echo "Event: $GITHUB_EVENT_NAME"
           echo "UTC now: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "ET  now: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
-          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
-            echo "Non-schedule event; allowing run."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          # --- Routing: only run for weekly-related events ---
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            kind=$(python3 -c "import json,os;e=json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8'));print((e.get('inputs') or {}).get('report_kind','daily'))")
+            echo "Dispatch report_kind: $kind"
+            if [ "$kind" = "weekly" ]; then
+              echo "Dispatch targets weekly; allowing run."
+              echo "should_run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Dispatch targets '$kind', not weekly; skipping."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
 
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
+            echo "Event is '$GITHUB_EVENT_NAME' (not schedule/dispatch); skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # --- Schedule event: check if this cron belongs to weekly ---
           cron=$(python3 -c "import json,os;print((json.load(open(os.environ['GITHUB_EVENT_PATH'],'r',encoding='utf-8')) or {}).get('schedule',''))")
           echo "Triggered cron: $cron"
 
+          # Weekly crons only (skip daily crons)
+          case "$cron" in
+            "0 12 * * 6"|"0 13 * * 6")
+              echo "Cron matches weekly schedule."
+              ;;
+            *)
+              echo "Cron '$cron' is not a weekly cron; skipping."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # --- EDT/EST guard ---
           z=$(TZ=America/New_York date +%z)
           case "$z" in
             "-0400") offset=-4 ;;
@@ -217,20 +250,13 @@ jobs:
           case "$cron" in
             "0 12 * * 6") expected=-4 ;;
             "0 13 * * 6") expected=-5 ;;
-            *) expected="" ;;
           esac
-
-          if [ -z "$expected" ]; then
-            echo "Unknown cron; allowing run (fail-open)."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           if [ "$offset" = "$expected" ]; then
             echo "Offset matches expected; allowing run."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Offset mismatch; skipping run." >&2
+            echo "Offset mismatch; skipping run."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
