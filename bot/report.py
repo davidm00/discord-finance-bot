@@ -424,10 +424,13 @@ def main() -> int:
         trades_value = "No recent trades above $25K."
 
     if contracts:
-        contract_lines = [
-            f"{c.get('recipient','').strip()}: {c.get('amount_human', c.get('amount',''))} | {c.get('agency','').strip()}"
-            for c in contracts[:3]
-        ]
+        contract_lines = []
+        for c in contracts[:3]:
+            prefix = "🔁" if c.get("is_recurring") else "🆕"
+            suffix = " (long-term renewal)" if c.get("is_recurring") else ""
+            contract_lines.append(
+                f"{prefix} {c.get('recipient','').strip()}: {c.get('amount_human', c.get('amount',''))} | {c.get('agency','').strip()}{suffix}"
+            )
         contracts_value = "\n".join(contract_lines) if contract_lines else "No major contracts found."
         if correlations:
             contracts_value += f"\n\n⚠️ {len(correlations)} correlation(s) detected — see analysis above"

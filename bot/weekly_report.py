@@ -494,10 +494,13 @@ def main() -> int:
         political_value = "No notable trades this week."
 
     if contracts:
-        contract_lines = [
-            f"{c.get('recipient','').strip()}: {c.get('amount_human', c.get('amount',''))} | {c.get('agency','').strip()}"
-            for c in contracts[:5]
-        ]
+        contract_lines = []
+        for c in contracts[:5]:
+            prefix = "🔁" if c.get("is_recurring") else "🆕"
+            suffix = " (long-term renewal)" if c.get("is_recurring") else ""
+            contract_lines.append(
+                f"{prefix} {c.get('recipient','').strip()}: {c.get('amount_human', c.get('amount',''))} | {c.get('agency','').strip()}{suffix}"
+            )
         contracts_value = "\n".join(contract_lines) if contract_lines else "No major contracts found."
     else:
         contracts_value = "No major contracts found."

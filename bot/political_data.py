@@ -16,6 +16,20 @@ ET_TZ = pytz.timezone("America/New_York")
 CAPITOL_TRADES_URL = "https://www.capitoltrades.com/trades?pageSize=96&sortBy=-txDate"
 USASPENDING_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 
+KNOWN_RECURRING_CONTRACTS = [
+    "SANDIA",
+    "UT-BATTELLE",
+    "LAWRENCE LIVERMORE",
+    "LOS ALAMOS",
+    "TRIAD NATIONAL SECURITY",
+    "SAVANNAH RIVER",
+    "BROOKHAVEN",
+    "OAK RIDGE",
+    "PACIFIC NORTHWEST",
+    "ARGONNE",
+    "FERMI RESEARCH",
+]
+
 
 COMMON_CO_WORDS = {
     "inc",
@@ -448,7 +462,15 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
 
     # Sort by amount descending, cap to 10
     contracts.sort(key=lambda x: float(x.get("amount") or 0.0), reverse=True)
-    return contracts[:10]
+    contracts = contracts[:10]
+
+    # Tag recurring vs new contracts
+    for c in contracts:
+        recipient_upper = c.get("recipient", "").upper()
+        c["is_recurring"] = any(frag in recipient_upper for frag in KNOWN_RECURRING_CONTRACTS)
+        print(f"[political] Contract: {c.get('recipient','')} — is_recurring: {c['is_recurring']}")
+
+    return contracts
 
 
 def _normalize(s: str) -> str:
