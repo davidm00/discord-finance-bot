@@ -5,3 +5,6 @@ requests
 feedparser
 beautifulsoup4
 lxml
+requests-cache
+tenacity
+exchange-calendars

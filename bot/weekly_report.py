@@ -22,8 +22,12 @@ import requests
 import yfinance as yf
 from anthropic import Anthropic
 
+from cache_manager import install_cache
+install_cache()
+
 from claude_analysis import DEFAULT_MODEL, DISCLAIMER_LINE
 from history_fetcher import fetch_weekly_history
+from market_calendar import get_market_state
 from market_data import fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data

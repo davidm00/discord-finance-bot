@@ -8,6 +8,8 @@ import pytz
 import requests
 import yfinance as yf
 
+from retry_utils import api_retry
+
 
 ET_TZ = pytz.timezone("America/New_York")
 
@@ -36,36 +38,84 @@ def _fetch_daily_series(ticker: str):
     return t, hist
 
 
-def fetch_market_data() -> dict[str, Any]:
-    """Fetch equities market data from yfinance.
+def _fetch_yahoo_chart_fallback(symbol: str):
+    """Direct Yahoo Finance chart API as fallback when yfinance library fails."""
+    # Map internal symbols to Yahoo API symbols
+    yahoo_symbol = symbol.replace("^", "%5E")
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}"
+    params = {"range": "5d", "interval": "1d"}
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    Returns a dict shaped like:
-    {
-      "equities": {
-        "SPY": {"price": float, "prev_close": float, "pct_change": float, "volume": int},
-        ...
-      },
-      "fetched_at_et": "YYYY-MM-DD HH:MM ET"
+    resp = requests.get(url, params=params, headers=headers, timeout=10)
+    if resp.status_code != 200:
+        return None
+
+    data = resp.json()
+    result = data.get("chart", {}).get("result")
+    if not result:
+        return None
+
+    quotes = result[0].get("indicators", {}).get("quote", [{}])[0]
+    closes = quotes.get("close", [])
+    volumes = quotes.get("volume", [])
+
+    if not closes or len(closes) < 2:
+        return None
+
+    # Filter out None values
+    valid_closes = [(i, c) for i, c in enumerate(closes) if c is not None]
+    if len(valid_closes) < 2:
+        return None
+
+    prev_close = valid_closes[-2][1]
+    last_close = valid_closes[-1][1]
+    last_idx = valid_closes[-1][0]
+    last_vol = volumes[last_idx] if last_idx < len(volumes) and volumes[last_idx] is not None else 0
+
+    return {
+        "price": float(last_close),
+        "prev_close": float(prev_close),
+        "volume": int(last_vol),
     }
 
-    (Crypto is handled separately via CoinGecko in bot/crypto_data.py.)
-    """
 
-    now_et = datetime.now(ET_TZ)
-    fetched_at_et = now_et.strftime("%Y-%m-%d %H:%M ET")
+def _fetch_finnhub_quote_fallback(symbol: str) -> dict | None:
+    """Finnhub quote API as a genuinely different data source fallback."""
+    import os
+    api_key = os.getenv("FINNHUB_API_KEY")
+    if not api_key:
+        return None
 
-    equities_tickers = ["SPY", "QQQ", "DIA", "^VIX"]
+    # Finnhub uses plain symbols, no ^ prefix
+    fh_symbol = symbol.replace("^", "")
+    url = "https://finnhub.io/api/v1/quote"
+    params = {"symbol": fh_symbol, "token": api_key}
 
-    equities: dict[str, Any] = {}
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        current = data.get("c")
+        prev_close = data.get("pc")
+        if current and prev_close and current > 0 and prev_close > 0:
+            return {
+                "price": float(current),
+                "prev_close": float(prev_close),
+                "volume": 0,  # Finnhub quote doesn't include volume
+            }
+    except Exception:
+        pass
+    return None
 
-    print("Fetching market data via yfinance...", file=sys.stdout)
 
-    for tk in equities_tickers:
-        try:
-            t, hist = _fetch_daily_series(tk)
-            if hist is None or len(hist) < 2:
-                raise ValueError("Insufficient history")
-
+@api_retry
+def fetch_equity_with_fallback(symbol: str) -> dict | None:
+    """Fetch equity data: yfinance → Yahoo chart API → Finnhub → None."""
+    # Attempt 1: yfinance
+    try:
+        t, hist = _fetch_daily_series(symbol)
+        if hist is not None and not hist.empty and "Close" in hist.columns and len(hist) >= 2:
             prev_close = _safe_float(hist["Close"].iloc[-2])
             last_close = _safe_float(hist["Close"].iloc[-1])
             last_vol = _safe_int(hist["Volume"].iloc[-1])
@@ -83,19 +133,79 @@ def fetch_market_data() -> dict[str, Any]:
             if price is None:
                 price = last_close
 
-            if prev_close is None or price is None:
-                raise ValueError("Missing price data")
+            if prev_close is not None and price is not None:
+                pct_change = ((price - prev_close) / prev_close) * 100.0
+                print(f"[market] {symbol}: fetched via yfinance")
+                return {
+                    "price": float(price),
+                    "prev_close": float(prev_close),
+                    "pct_change": float(pct_change),
+                    "volume": int(last_vol) if last_vol is not None else 0,
+                }
+    except Exception as e:
+        print(f"[market] WARNING: yfinance failed for {symbol}: {e}")
 
-            pct_change = ((price - prev_close) / prev_close) * 100.0
-
-            equities[tk] = {
-                "price": float(price),
-                "prev_close": float(prev_close),
+    # Attempt 2: Direct Yahoo chart API (different code path, same upstream)
+    try:
+        result = _fetch_yahoo_chart_fallback(symbol)
+        if result:
+            pct_change = ((result["price"] - result["prev_close"]) / result["prev_close"]) * 100.0
+            print(f"[market] {symbol}: fetched via Yahoo chart API fallback")
+            return {
+                "price": result["price"],
+                "prev_close": result["prev_close"],
                 "pct_change": float(pct_change),
-                "volume": int(last_vol) if last_vol is not None else 0,
+                "volume": result["volume"],
             }
-        except Exception as exc:
-            print(f"WARNING: Failed to fetch {tk}: {exc}", file=sys.stderr)
+    except Exception as e:
+        print(f"[market] WARNING: Yahoo chart fallback failed for {symbol}: {e}")
+
+    # Attempt 3: Finnhub (genuinely different data source)
+    try:
+        result = _fetch_finnhub_quote_fallback(symbol)
+        if result:
+            pct_change = ((result["price"] - result["prev_close"]) / result["prev_close"]) * 100.0
+            print(f"[market] {symbol}: fetched via Finnhub fallback")
+            return {
+                "price": result["price"],
+                "prev_close": result["prev_close"],
+                "pct_change": float(pct_change),
+                "volume": result["volume"],
+            }
+    except Exception as e:
+        print(f"[market] WARNING: Finnhub fallback failed for {symbol}: {e}")
+
+    print(f"[market] WARNING: {symbol} in degraded mode — no fresh data")
+    return None
+
+
+def fetch_market_data() -> dict[str, Any]:
+    """Fetch equities market data with multi-source fallback.
+
+    Returns a dict shaped like:
+    {
+      "equities": {
+        "SPY": {"price": float, "prev_close": float, "pct_change": float, "volume": int},
+        ...
+      },
+      "fetched_at_et": "YYYY-MM-DD HH:MM ET"
+    }
+    """
+
+    now_et = datetime.now(ET_TZ)
+    fetched_at_et = now_et.strftime("%Y-%m-%d %H:%M ET")
+
+    equities_tickers = ["SPY", "QQQ", "DIA", "^VIX"]
+
+    equities: dict[str, Any] = {}
+
+    print("Fetching market data via yfinance (with fallbacks)...", file=sys.stdout)
+
+    for tk in equities_tickers:
+        result = fetch_equity_with_fallback(tk)
+        if result is not None:
+            equities[tk] = result
+        else:
             equities[tk] = None
 
     return {
@@ -108,6 +218,7 @@ def fetch_macro_context() -> dict[str, Any]:
     """Fetch macro context: 10Y Treasury yield, DXY, Fear & Greed Index.
 
     Each field is fetched independently — if one fails, the others still return.
+    Uses the same multi-source fallback pattern as equity fetches.
     """
     print("[market] Fetching macro context (TNX, DXY, Fear & Greed)...")
 
@@ -118,21 +229,19 @@ def fetch_macro_context() -> dict[str, Any]:
         "fear_greed_rating": None,
     }
 
-    # 10-Year Treasury Yield (^TNX)
+    # 10-Year Treasury Yield (^TNX) — with fallback
     try:
-        tnx = yf.Ticker("^TNX")
-        hist = tnx.history(period="2d")
-        if hist is not None and not hist.empty:
-            result["treasury_10y"] = round(float(hist["Close"].iloc[-1]), 2)
+        tnx_data = fetch_equity_with_fallback("^TNX")
+        if tnx_data and tnx_data.get("price") is not None:
+            result["treasury_10y"] = round(float(tnx_data["price"]), 2)
     except Exception as exc:
         print(f"[market] WARNING: TNX fetch failed — {exc}")
 
-    # US Dollar Index (DX-Y.NYB)
+    # US Dollar Index (DX-Y.NYB) — with fallback
     try:
-        dxy = yf.Ticker("DX-Y.NYB")
-        hist = dxy.history(period="2d")
-        if hist is not None and not hist.empty:
-            result["dollar_index"] = round(float(hist["Close"].iloc[-1]), 2)
+        dxy_data = fetch_equity_with_fallback("DX-Y.NYB")
+        if dxy_data and dxy_data.get("price") is not None:
+            result["dollar_index"] = round(float(dxy_data["price"]), 2)
     except Exception as exc:
         print(f"[market] WARNING: DXY fetch failed — {exc}")
 

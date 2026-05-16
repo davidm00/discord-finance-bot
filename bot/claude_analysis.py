@@ -100,12 +100,35 @@ def generate_analysis(
 
         crypto_block = "\n".join(lines)
 
-    # (3) News headlines block
+    # (3) News headlines block — with source weights and event classification
     if news_items:
-        headlines_block = "Recent headlines:\n" + "\n".join(
-            f"{i}. [{it.get('source','Unknown')}] {it.get('headline','').strip()} ({it.get('published_et','').strip()})"
-            for i, it in enumerate(news_items, start=1)
-        )
+        # Group headlines by event type
+        event_groups: dict[str, list] = {}
+        for it in news_items:
+            et = it.get("event_type", "general")
+            if et not in event_groups:
+                event_groups[et] = []
+            event_groups[et].append(it)
+
+        event_emoji = {
+            "earnings": "📊", "merger_acquisition": "🔀", "regulatory": "⚖️",
+            "geopolitical": "🌍", "macro": "📈", "executive": "👔",
+            "crypto": "₿", "general": "📰",
+        }
+
+        hl_parts = ["Recent headlines (tagged with source reliability 0.0-1.0 and event type):"]
+        idx = 1
+        for et, items_group in event_groups.items():
+            emoji = event_emoji.get(et, "📰")
+            label = et.upper().replace("_", " ")
+            for it in items_group:
+                source = it.get("source", "Unknown")
+                weight = it.get("weight", "0.4")
+                headline = it.get("headline", '').strip()
+                pub = it.get("published_et", '').strip()
+                hl_parts.append(f"{idx}. {emoji} {label}: [{source} {weight}] {headline} ({pub})")
+                idx += 1
+        headlines_block = "\n".join(hl_parts)
     else:
         headlines_block = "Recent headlines:\n(no headlines available)"
 
@@ -261,21 +284,43 @@ def generate_analysis(
         )
 
     ticker_instruction = (
-        "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers (prefer 3 unless there are truly strong signals for more).\n"
-        "For each ticker provide:\n"
-        "- The ticker symbol and company name\n"
-        "- A rating: BUY / SELL / HOLD / WATCH\n"
-        "- One plain-English sentence explaining exactly why, citing the specific data point from today's report that drives the call\n"
-        "- A confidence level: HIGH / MEDIUM / LOW\n\n"
-        "Format each ticker block like:\n"
-        "TICKER — Company Name\n"
-        "Rating: BUY\n"
-        "Reason: ...\n"
-        "Confidence: HIGH\n\n"
-        "Only recommend tickers that appear in today's actual data — news, contracts, political trades, market movers, or the thematic watchlist. Do not invent recommendations.\n"
+        "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers (prefer 3 unless there are truly strong signals for more).\n\n"
+        "For each ticker, structure your analysis in three steps before giving a rating:\n\n"
+        "BULL CASE: In one sentence, what is the strongest argument FOR this ticker right now based on today's data?\n\n"
+        "BEAR CASE: In one sentence, what is the strongest argument AGAINST this ticker right now based on today's data?\n\n"
+        "VERDICT: Weigh both sides and provide:\n"
+        "- Rating: BUY / SELL / HOLD / WATCH\n"
+        "- Confidence: HIGH / MEDIUM / LOW\n"
+        "- One plain-English sentence explaining the verdict, citing the specific data point that tips the balance\n\n"
+        "Format each ticker exactly like this:\n\n"
+        "**TICKER — Company Name**\n"
+        "Bull: [bull case sentence]\n"
+        "Bear: [bear case sentence]\n"
+        "Rating: BUY/SELL/HOLD/WATCH\n"
+        "Reason: [verdict sentence citing specific data]\n"
+        "Confidence: HIGH/MEDIUM/LOW\n\n"
+        "Only recommend tickers that appear in today's actual data — news, contracts, political trades, market movers, or the thematic watchlist. "
+        "Do not invent recommendations.\n"
         "Do not omit this section; if you're running long, shorten earlier paragraphs.\n"
         "End with this exact disclaimer on its own line (no quotes):\n"
         f"{DISCLAIMER_LINE}"
+    )
+
+    source_weight_instruction = (
+        "News headlines are tagged with source reliability scores (0.0-1.0). "
+        "Weight higher-scored sources more heavily in your analysis. "
+        "Sources scoring below 0.5 should only be used if no higher-quality source covers the same story."
+    )
+
+    event_classification_instruction = (
+        "Headlines are pre-classified by event type. For each type present, "
+        "apply the appropriate analytical lens:\n"
+        "- EARNINGS: focus on beat/miss vs estimates and forward guidance\n"
+        "- GEOPOLITICAL: assess direct market impact and sector exposure\n"
+        "- MACRO: evaluate Fed/rate implications for equities and crypto\n"
+        "- M&A: consider sector implications and target/acquirer dynamics\n"
+        "- REGULATORY: assess risk exposure for named companies\n"
+        "- CRYPTO: note correlation to broader risk sentiment"
     )
 
     sections = [
@@ -308,7 +353,7 @@ def generate_analysis(
     if prev_block:
         sections.append(prev_block)
 
-    full_prompt = "\n\n".join(sections + [analysis_instruction, ticker_instruction])
+    full_prompt = "\n\n".join(sections + [analysis_instruction, source_weight_instruction, event_classification_instruction, ticker_instruction])
 
     print(f"[claude] Prompt token estimate: ~{len(full_prompt) // 4} tokens")
     print(f"[claude] Calling Claude API (model={DEFAULT_MODEL})...")

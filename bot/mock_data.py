@@ -118,14 +118,17 @@ higher with Iran war tailwinds.
 **Tickers to Watch**
 
 **LMT — Lockheed Martin**
+Bull: $2.3B DoD contract + senator buy 3 days before announcement is a strong signal.
+Bear: Defense stocks already priced in elevated spending; contract may already be in the price.
 Rating: BUY
-Reason: $2.3B DoD contract awarded May 15 + Senator Tuberville bought
-$50K-$100K on May 12 — 3 days before the contract announcement.
+Reason: Contract-politician trade correlation within 3 days is the strongest signal type we track.
 Confidence: HIGH
 
 **XOM — ExxonMobil**
+Bull: Iran war driving energy demand higher with direct tailwind for US exporters.
+Bear: Any diplomatic resolution could instantly deflate the oil price premium.
 Rating: WATCH
-Reason: Iran war tailwind continuing with China oil deal progress.
+Reason: Geopolitical tailwind is real but binary — watch for resolution signals.
 Confidence: MEDIUM
 
 \u26a0\ufe0f Not financial advice. For informational purposes only. Always do your own research.

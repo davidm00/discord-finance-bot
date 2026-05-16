@@ -12,6 +12,8 @@ import feedparser
 import pytz
 import requests
 
+from retry_utils import api_retry
+
 
 ET_TZ = pytz.timezone("America/New_York")
 
@@ -20,6 +22,88 @@ MARKETWATCH_RSS = "https://feeds.content.dowjones.io/public/rss/mw_topstories"
 BLOOMBERG_RSS = "https://feeds.bloomberg.com/markets/news.rss"
 
 FINNHUB_GENERAL_NEWS = "https://finnhub.io/api/v1/news"
+
+
+# === Source Reliability Weighting ===
+SOURCE_WEIGHTS = {
+    # Tier 1 — Wire services (highest reliability)
+    "reuters": 1.0,
+    "ap": 1.0,
+    "associated press": 1.0,
+    # Tier 2 — Major financial media
+    "bloomberg": 0.9,
+    "wsj": 0.9,
+    "wall street journal": 0.9,
+    "financial times": 0.9,
+    "ft": 0.9,
+    # Tier 3 — Financial media
+    "cnbc": 0.8,
+    "marketwatch": 0.8,
+    "barrons": 0.8,
+    "fortune": 0.7,
+    # Tier 4 — General news with finance coverage
+    "nyt": 0.6,
+    "new york times": 0.6,
+    "washington post": 0.6,
+    # Tier 5 — Analysis and opinion
+    "seeking alpha": 0.5,
+    "motley fool": 0.5,
+    # Tier 6 — Aggregators and RSS
+    "finnhub": 0.4,
+    "google news": 0.3,
+}
+DEFAULT_WEIGHT = 0.4
+
+
+def get_source_weight(source: str) -> float:
+    """Return reliability weight for a news source."""
+    source_lower = source.lower().strip()
+    for key, weight in SOURCE_WEIGHTS.items():
+        if key in source_lower:
+            return weight
+    return DEFAULT_WEIGHT
+
+
+# === Event Classification ===
+EVENT_KEYWORDS = {
+    "earnings": ["earnings", "eps", "revenue", "quarterly", "beats", "misses",
+                 "guidance", "profit", "loss", "q1", "q2", "q3", "q4",
+                 "fiscal", "results", "reports"],
+    "merger_acquisition": ["merger", "acquisition", "takeover", "buyout",
+                           "acquires", "deal", "bid", "offer", "buys"],
+    "regulatory": ["sec", "ftc", "doj", "antitrust", "regulation", "fine",
+                   "penalty", "investigation", "lawsuit", "ruling", "ban"],
+    "geopolitical": ["war", "sanctions", "tariff", "trade", "conflict",
+                     "iran", "china", "russia", "ukraine", "nato",
+                     "strait", "military", "defense"],
+    "macro": ["fed", "federal reserve", "interest rate", "inflation", "cpi",
+              "gdp", "unemployment", "jobs", "fomc", "powell", "treasury",
+              "yield", "recession", "economic"],
+    "executive": ["ceo", "cfo", "coo", "resigns", "appointed", "fired",
+                  "steps down", "leadership", "founder"],
+    "crypto": ["bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain",
+               "defi", "nft", "solana", "coinbase"],
+}
+
+EVENT_EMOJI = {
+    "earnings": "📊",
+    "merger_acquisition": "🔀",
+    "regulatory": "⚖️",
+    "geopolitical": "🌍",
+    "macro": "📈",
+    "executive": "👔",
+    "crypto": "₿",
+    "general": "📰",
+}
+
+
+def classify_event(headline: str) -> str:
+    """Classify a headline into an event type."""
+    headline_lower = headline.lower()
+    for event_type, keywords in EVENT_KEYWORDS.items():
+        if any(kw in headline_lower for kw in keywords):
+            return event_type
+    return "general"
 
 
 def _dt_to_et_string(dt: datetime) -> str:
@@ -225,8 +309,33 @@ def fetch_top_headlines() -> list[dict[str, str]]:
 
     items = deduped_items
 
-    # Sort by published_dt descending.
-    items.sort(key=lambda x: x.get("published_dt") or datetime.min.replace(tzinfo=ET_TZ), reverse=True)
+    # Apply source weighting and event classification
+    for it in items:
+        source = str(it.get("source") or "Unknown")
+        it["weight"] = get_source_weight(source)
+        it["event_type"] = classify_event(str(it.get("headline") or ""))
+
+    # Sort by weight descending first, then by published_dt descending
+    items.sort(
+        key=lambda x: (x.get("weight", 0.4), x.get("published_dt") or datetime.min.replace(tzinfo=ET_TZ)),
+        reverse=True,
+    )
+
+    # Log event classification stats
+    event_counts: dict[str, int] = {}
+    for it in items:
+        et = it.get("event_type", "general")
+        event_counts[et] = event_counts.get(et, 0) + 1
+    print(f"[news] Event classification: {event_counts}")
+    if event_counts:
+        top_event = max(event_counts, key=event_counts.get)
+        print(f"[news] Top event type today: {top_event} ({event_counts[top_event]} headlines)")
+
+    if items:
+        top_source = items[0].get("source", "Unknown")
+        top_weight = items[0].get("weight", 0.4)
+        print(f"[news] Source weights applied. Top source: {top_source} ({top_weight})")
+        print("[news] Headlines sorted by reliability then recency")
 
     top = items[:10]
 
@@ -238,6 +347,8 @@ def fetch_top_headlines() -> list[dict[str, str]]:
                 "source": str(it.get("source") or "Unknown").strip(),
                 "url": str(it.get("url") or "").strip(),
                 "published_et": str(it.get("published_et") or "").strip(),
+                "weight": str(it.get("weight", 0.4)),
+                "event_type": str(it.get("event_type", "general")),
             }
         )
 

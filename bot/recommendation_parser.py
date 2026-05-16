@@ -58,9 +58,11 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
     rating = ""
     reason = ""
     confidence = ""
+    bull_case = ""
+    bear_case = ""
 
     if fmt == "daily":
-        # Daily: explicit Rating:/Reason:/Confidence: labels
+        # Daily: explicit Rating:/Reason:/Confidence: labels + optional Bull:/Bear:
         reason_lines = []
         in_reason = False
         for line in block_lines:
@@ -68,6 +70,20 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             if not stripped:
                 if in_reason:
                     reason_lines.append("")
+                continue
+
+            # Bull case extraction
+            m_bull = re.search(r"\bbull(?:\s+case)?\s*[:\-—–]\s*(.+)", stripped, re.IGNORECASE)
+            if m_bull:
+                in_reason = False
+                bull_case = m_bull.group(1).strip().replace("**", "").replace("*", "")
+                continue
+
+            # Bear case extraction
+            m_bear = re.search(r"\bbear(?:\s+case)?\s*[:\-—–]\s*(.+)", stripped, re.IGNORECASE)
+            if m_bear:
+                in_reason = False
+                bear_case = m_bear.group(1).strip().replace("**", "").replace("*", "")
                 continue
 
             m_rating = re.search(r"\brating\s*[:\-—–]\s*([^\n]+)", stripped, re.IGNORECASE)
@@ -153,7 +169,11 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
 
     if ticker and rating and confidence:
         print(f"[parser] Successfully parsed: {ticker} — {rating} ({confidence})")
-        return {"ticker": ticker, "rating": rating, "reason": reason, "confidence": confidence}
+        rec = {"ticker": ticker, "rating": rating, "reason": reason, "confidence": confidence}
+        # Add bull/bear if present (backwards compatible)
+        rec["bull_case"] = bull_case if bull_case else None
+        rec["bear_case"] = bear_case if bear_case else None
+        return rec
     return None
 
 

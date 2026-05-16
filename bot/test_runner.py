@@ -386,6 +386,91 @@ Confidence: Medium-High
     except Exception as e:
         runner.record("test_broken_data_handling", False, str(e))
 
+    # test_market_calendar
+    try:
+        from market_calendar import get_market_state
+        result = get_market_state()
+        assert isinstance(result, dict), f"expected dict, got {type(result)}"
+        assert "state" in result, "missing 'state' key"
+        assert result["state"] in ["open", "pre_market", "post_market", "closed", "holiday", "unknown"], \
+            f"unexpected state: {result['state']}"
+        assert "label" in result, "missing 'label' key"
+        assert isinstance(result["label"], str) and len(result["label"]) > 0, "label empty"
+        assert "is_trading_day" in result, "missing 'is_trading_day' key"
+        assert isinstance(result["is_trading_day"], bool), "is_trading_day not bool"
+        runner.record("test_market_calendar", True, f"state={result['state']}")
+    except Exception as e:
+        runner.record("test_market_calendar", False, str(e))
+
+    # test_source_weighting
+    try:
+        from news_fetcher import get_source_weight
+        assert get_source_weight("Reuters") == 1.0, f"Reuters: {get_source_weight('Reuters')}"
+        assert get_source_weight("Bloomberg") == 0.9, f"Bloomberg: {get_source_weight('Bloomberg')}"
+        assert get_source_weight("CNBC") == 0.8, f"CNBC: {get_source_weight('CNBC')}"
+        assert get_source_weight("Unknown Source XYZ") == 0.4, f"Unknown: {get_source_weight('Unknown Source XYZ')}"
+        assert get_source_weight("Google News RSS") == 0.3, f"Google: {get_source_weight('Google News RSS')}"
+        runner.record("test_source_weighting", True)
+    except Exception as e:
+        runner.record("test_source_weighting", False, str(e))
+
+    # test_event_classification
+    try:
+        from news_fetcher import classify_event
+        assert classify_event("Fed raises interest rates amid inflation") == "macro", \
+            f"got: {classify_event('Fed raises interest rates amid inflation')}"
+        assert classify_event("Apple acquires startup for $2B") == "merger_acquisition", \
+            f"got: {classify_event('Apple acquires startup for $2B')}"
+        assert classify_event("Nike earnings beat estimates") == "earnings", \
+            f"got: {classify_event('Nike earnings beat estimates')}"
+        assert classify_event("Iran war pushes oil prices higher") == "geopolitical", \
+            f"got: {classify_event('Iran war pushes oil prices higher')}"
+        assert classify_event("CEO resigns after board pressure") == "executive", \
+            f"got: {classify_event('CEO resigns after board pressure')}"
+        assert classify_event("Bitcoin hits new high") == "crypto", \
+            f"got: {classify_event('Bitcoin hits new high')}"
+        assert classify_event("Random news story") == "general", \
+            f"got: {classify_event('Random news story')}"
+        runner.record("test_event_classification", True)
+    except Exception as e:
+        runner.record("test_event_classification", False, str(e))
+
+    # test_bull_bear_parser
+    try:
+        import recommendation_parser
+
+        response = """
+**Tickers to Watch**
+
+**XOM — ExxonMobil**
+Bull: Iran war driving energy demand higher with direct tailwind for US exporters.
+Bear: Any diplomatic resolution could instantly deflate the oil price premium.
+Rating: WATCH
+Reason: Geopolitical tailwind is real but binary — watch for resolution signals.
+Confidence: MEDIUM
+
+**LMT — Lockheed Martin**
+Bull: $2.3B DoD contract + senator buy 3 days before announcement is a strong signal.
+Bear: Defense stocks already priced in elevated spending; contract may already be in the price.
+Rating: BUY
+Reason: Contract-politician trade correlation within 3 days is the strongest signal type we track.
+Confidence: HIGH
+"""
+        results = recommendation_parser.parse_recommendations(response)
+        assert len(results) == 2, f"expected 2 recs, got {len(results)}"
+        assert results[0]["ticker"] == "XOM", f"expected XOM, got {results[0]['ticker']}"
+        assert results[0]["bull_case"] is not None, "XOM bull_case is None"
+        assert results[0]["bear_case"] is not None, "XOM bear_case is None"
+        assert len(results[0]["bull_case"]) > 10, f"bull_case too short: {results[0]['bull_case']}"
+        assert len(results[0]["bear_case"]) > 10, f"bear_case too short: {results[0]['bear_case']}"
+        assert results[1]["rating"] == "BUY", f"expected BUY, got {results[1]['rating']}"
+        assert results[1]["confidence"] == "HIGH", f"expected HIGH, got {results[1]['confidence']}"
+        assert results[1]["bull_case"] is not None, "LMT bull_case is None"
+        assert results[1]["bear_case"] is not None, "LMT bear_case is None"
+        runner.record("test_bull_bear_parser", True)
+    except Exception as e:
+        runner.record("test_bull_bear_parser", False, str(e))
+
     # === Group 3: End-to-End Pipeline (Mock) ===
     print("\n--- Group 3: End-to-End Pipeline (Mock) ---")
 

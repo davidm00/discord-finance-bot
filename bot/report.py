@@ -17,10 +17,14 @@ from datetime import datetime
 import pytz
 import requests
 
+from cache_manager import install_cache
+install_cache()
+
 from claude_analysis import DISCLAIMER_LINE, generate_analysis
 from crypto_data import fetch_crypto_data
 from earnings_fetcher import fetch_upcoming_earnings
 from history_fetcher import fetch_previous_reports
+from market_calendar import get_market_state
 from market_data import fetch_market_data, fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
@@ -277,6 +281,10 @@ def main() -> int:
     report_type = _label_for_run(now_et)
     date_et = now_et.strftime("%Y-%m-%d")
 
+    # Market state detection
+    market_state = get_market_state()
+    print(f"[report] Market state: {market_state['state']} — {market_state['label']}")
+
     print(f"[report] Report type: {report_type} ({date_et} ET)")
 
     print("[report] Fetching previous Discord reports...")
@@ -449,13 +457,17 @@ def main() -> int:
     else:
         earnings_value = "No major earnings in the next 3 days."
 
-    # Recommendations field
+    # Recommendations field — Bull/Bear format
     if recs:
         parts = []
         for r in recs[:5]:
             parts.append(
                 f"{r.get('ticker','').strip()} — {r.get('rating','').strip()} ({r.get('confidence','').strip()})"
             )
+            if r.get("bull_case"):
+                parts.append(f"🐂 {r['bull_case']}")
+            if r.get("bear_case"):
+                parts.append(f"🐻 {r['bear_case']}")
             parts.append(str(r.get("reason") or "").strip())
             parts.append("")
         parts.append("⚠️ Not financial advice. For informational purposes only.")
@@ -463,11 +475,12 @@ def main() -> int:
     else:
         rec_value = "No strong signals identified today."
 
+    market_label = market_state.get("label", "")
     if report_type == "pre-market":
-        title = f"📈 Pre-Market Briefing — {date_et} ET"
+        title = f"📈 Pre-Market Briefing — {date_et} ET | {market_label}"
         color = 3066993
     else:
-        title = f"📉 Post-Market Recap — {date_et} ET"
+        title = f"📉 Post-Market Recap — {date_et} ET | {market_label}"
         color = 15158332
 
     fetched_at_et = market_data.get("fetched_at_et", now_et.strftime("%Y-%m-%d %H:%M ET"))
