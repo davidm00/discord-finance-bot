@@ -539,7 +539,9 @@ def main() -> int:
             print(f"[report] {label} size: {post_chars} chars")
         embeds.append(emb)
 
-    payload = {"embeds": embeds}
+    # Discord's 6000 char limit is across ALL embeds in one message.
+    # Send each embed as a separate webhook POST to get full 6000 chars per message.
+    payloads = [{"embeds": [emb]} for emb in embeds]
 
     if dry_run:
         print("[report] DRY_RUN=1 set — not sending to Discord.")
@@ -564,16 +566,22 @@ def main() -> int:
         print(f"[report] Done. Total runtime: {elapsed:.1f}s")
         return 0
 
-    print("[report] Sending to Discord...")
-    try:
-        resp = requests.post(webhook_url, json=payload, timeout=15)
-    except requests.RequestException as exc:
-        print(f"ERROR: Webhook POST failed: {exc}", file=sys.stderr)
-        return 1
+    print(f"[report] Sending to Discord ({len(payloads)} message(s))...")
+    for i, payload in enumerate(payloads):
+        try:
+            resp = requests.post(webhook_url, json=payload, timeout=15)
+        except requests.RequestException as exc:
+            print(f"ERROR: Webhook POST (message {i+1}) failed: {exc}", file=sys.stderr)
+            return 1
 
-    if not (200 <= resp.status_code < 300):
-        print(f"ERROR: Webhook POST failed with {resp.status_code}: {resp.text}", file=sys.stderr)
-        return 1
+        if not (200 <= resp.status_code < 300):
+            print(f"ERROR: Webhook POST (message {i+1}) failed with {resp.status_code}: {resp.text}", file=sys.stderr)
+            return 1
+
+        print(f"[report] Message {i+1}/{len(payloads)} sent successfully.")
+        # Brief pause between messages to maintain order in Discord
+        if i < len(payloads) - 1:
+            time.sleep(1)
 
     elapsed = time.monotonic() - start
     print(f"[report] Done. Total runtime: {elapsed:.1f}s")
