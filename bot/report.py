@@ -107,6 +107,11 @@ def _enforce_disclaimer(text: str) -> str:
 
 
 def _write_local_preview_markdown(embed: dict) -> str | None:
+    """Legacy single-embed version — delegates to multi."""
+    return _write_local_preview_markdown_multi([embed])
+
+
+def _write_local_preview_markdown_multi(embeds: list[dict]) -> str | None:
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     out_dir = os.path.join(repo_root, "local-output")
     out_path = os.path.join(out_dir, "latest_report.md")
@@ -114,27 +119,33 @@ def _write_local_preview_markdown(embed: dict) -> str | None:
     try:
         os.makedirs(out_dir, exist_ok=True)
 
-        title = str(embed.get("title") or "").strip()
-        desc = str(embed.get("description") or "").strip()
-        fields = embed.get("fields") or []
-
         parts: list[str] = []
-        parts.append(f"# {title}" if title else "# Discord Finance Bot — Local Preview")
-        parts.append("")
-        parts.append("## Analysis")
-        parts.append("")
-        parts.append(desc or "(no analysis)")
-        parts.append("")
+        for embed in embeds:
+            title = str(embed.get("title") or "").strip()
+            desc = str(embed.get("description") or "").strip()
+            fields = embed.get("fields") or []
 
-        for f in fields:
-            name = str((f or {}).get("name") or "").strip()
-            value = str((f or {}).get("value") or "").strip()
-            if not name:
-                continue
-            parts.append(f"## {name}")
-            parts.append("")
-            parts.append(value or "(empty)")
-            parts.append("")
+            if title:
+                parts.append(f"# {title}")
+                parts.append("")
+            if desc:
+                parts.append("## Analysis")
+                parts.append("")
+                parts.append(desc)
+                parts.append("")
+
+            for f in fields:
+                name = str((f or {}).get("name") or "").strip()
+                value = str((f or {}).get("value") or "").strip()
+                if not name:
+                    continue
+                parts.append(f"## {name}")
+                parts.append("")
+                parts.append(value or "(empty)")
+                parts.append("")
+
+        if not parts:
+            parts.append("# Discord Finance Bot — Local Preview")
 
         with open(out_path, "w", encoding="utf-8") as out:
             out.write("\n".join(parts).rstrip() + "\n")
@@ -485,44 +496,63 @@ def main() -> int:
 
     fetched_at_et = market_data.get("fetched_at_et", now_et.strftime("%Y-%m-%d %H:%M ET"))
 
-    print("[report] Building Discord embed...")
-    embed = {
+    print("[report] Building Discord embeds...")
+
+    # Split into multiple embeds to avoid 6000 char total limit per embed.
+    # Embed 1: Analysis narrative + market prices
+    # Embed 2: Data fields (political, contracts, headlines, earnings, tickers)
+    embed1 = {
         "title": title,
         "color": color,
         "description": analysis[:4096],
         "fields": [
             {"name": "🇺🇸 Equities", "value": "\n".join(eq_lines), "inline": True},
             {"name": "₿ Crypto", "value": "\n".join(cr_lines), "inline": True},
-            {"name": "🏛️ Political Trades", "value": trades_value, "inline": False},
-            {"name": "📋 Gov Contracts", "value": contracts_value, "inline": False},
-            {"name": "📰 Top Headlines", "value": headlines_value, "inline": False},
-            {"name": "📅 Upcoming Earnings", "value": earnings_value, "inline": False},
-            {"name": "🎯 Tickers to Watch", "value": rec_value, "inline": False},
         ],
+    }
+
+    embed2_fields = [
+        {"name": "🏛️ Political Trades", "value": trades_value, "inline": False},
+        {"name": "📋 Gov Contracts", "value": contracts_value, "inline": False},
+        {"name": "📰 Top Headlines", "value": headlines_value, "inline": False},
+        {"name": "📅 Upcoming Earnings", "value": earnings_value, "inline": False},
+    ]
+    # Tickers to Watch often exceeds field limit (1024 chars) with bull/bear cases,
+    # so it goes in the description (4096 char limit) instead of a field.
+    tickers_header = "**🎯 Tickers to Watch**\n" if rec_value else ""
+    embed2 = {
+        "color": color,
+        "description": (tickers_header + rec_value)[:4096] if rec_value else "",
+        "fields": embed2_fields,
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},
     }
 
-    pre_chars = _embed_char_count(embed)
-    embed = _sanitize_embed(embed)
-    post_chars = _embed_char_count(embed)
-    if post_chars != pre_chars:
-        print(f"[report] Embed clamped to Discord limits: {pre_chars} -> {post_chars} chars")
-    else:
-        print(f"[report] Embed size chars: {post_chars}")
+    embeds = []
+    for i, emb in enumerate([embed1, embed2]):
+        pre_chars = _embed_char_count(emb)
+        emb = _sanitize_embed(emb)
+        post_chars = _embed_char_count(emb)
+        label = f"embed{i+1}"
+        if post_chars != pre_chars:
+            print(f"[report] {label} clamped: {pre_chars} -> {post_chars} chars")
+        else:
+            print(f"[report] {label} size: {post_chars} chars")
+        embeds.append(emb)
 
-    payload = {"embeds": [embed]}
+    payload = {"embeds": embeds}
 
     if dry_run:
         print("[report] DRY_RUN=1 set — not sending to Discord.")
-        # Avoid dumping huge payloads in logs; show only a small preview.
-        preview = {
-            "title": embed.get("title"),
-            "fields": [f.get("name") for f in embed.get("fields") or []],
-            "description_chars": len(embed.get("description") or ""),
-        }
-        print(f"[report] Embed preview: {preview}")
+        for i, emb in enumerate(embeds):
+            preview = {
+                "title": emb.get("title"),
+                "fields": [f.get("name") for f in emb.get("fields") or []],
+                "description_chars": len(emb.get("description") or ""),
+            }
+            print(f"[report] Embed {i+1} preview: {preview}")
 
-        md_path = _write_local_preview_markdown(embed)
+        # Write local preview combining all embeds
+        md_path = _write_local_preview_markdown_multi(embeds)
         if md_path:
             print(f"[report] Wrote local preview markdown: {md_path}")
 
