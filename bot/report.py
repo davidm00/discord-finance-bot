@@ -9,7 +9,6 @@ an embed to Discord.
 from __future__ import annotations
 
 import os
-import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -499,23 +498,12 @@ def main() -> int:
 
     print("[report] Building Discord embeds...")
 
-    # Strip "Tickers to Watch" section from analysis narrative since we display
-    # the parsed version (with 🐂/🐻) separately in embed2.
-    # Claude varies format heavily (##, **, random emojis like 📌🎯👀🔭📊), so we
-    # just look for "Tickers to Watch" on its own line with any prefix.
-    analysis_narrative = re.split(
-        r'\n+(?:---\s*\n+)?\s*(?:[#*]{0,4})\s*\S*\s*(?:\*{0,2})\s*Tickers to Watch',
-        analysis,
-        maxsplit=1
-    )[0].rstrip()
-
-    # Split into multiple embeds to avoid 6000 char total limit per embed.
-    # Embed 1: Analysis narrative + market prices
-    # Embed 2: Data fields (political, contracts, headlines, earnings, tickers)
+    # Embed 1: Full Claude analysis (includes Tickers to Watch) + market prices
+    # Embed 2: Data fields (political, contracts, headlines, earnings)
     embed1 = {
         "title": title,
         "color": color,
-        "description": analysis_narrative[:4096],
+        "description": analysis[:4096],
         "fields": [
             {"name": "🇺🇸 Equities", "value": "\n".join(eq_lines), "inline": True},
             {"name": "₿ Crypto", "value": "\n".join(cr_lines), "inline": True},
@@ -528,12 +516,8 @@ def main() -> int:
         {"name": "📰 Top Headlines", "value": headlines_value, "inline": False},
         {"name": "📅 Upcoming Earnings", "value": earnings_value, "inline": False},
     ]
-    # Tickers to Watch often exceeds field limit (1024 chars) with bull/bear cases,
-    # so it goes in the description (4096 char limit) instead of a field.
-    tickers_header = "**🎯 Tickers to Watch**\n" if rec_value else ""
     embed2 = {
         "color": color,
-        "description": (tickers_header + rec_value)[:4096] if rec_value else "",
         "fields": embed2_fields,
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},
     }
