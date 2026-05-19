@@ -9,6 +9,7 @@ an embed to Discord.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -498,13 +499,22 @@ def main() -> int:
 
     print("[report] Building Discord embeds...")
 
+    # Strip "Tickers to Watch" section from analysis narrative since we display
+    # the parsed version (with 🐂/🐻) separately in embed2.
+    # Claude uses varying formats: "## Tickers to Watch", "**📌 Tickers to Watch**", etc.
+    analysis_narrative = re.split(
+        r'\n---\s*\n+\s*(?:\*{0,2})(?:#{1,3}\s*)?(?:📌|🎯)?\s*(?:\*{0,2})\s*Tickers to Watch',
+        analysis,
+        maxsplit=1
+    )[0].rstrip()
+
     # Split into multiple embeds to avoid 6000 char total limit per embed.
     # Embed 1: Analysis narrative + market prices
     # Embed 2: Data fields (political, contracts, headlines, earnings, tickers)
     embed1 = {
         "title": title,
         "color": color,
-        "description": analysis[:4096],
+        "description": analysis_narrative[:4096],
         "fields": [
             {"name": "🇺🇸 Equities", "value": "\n".join(eq_lines), "inline": True},
             {"name": "₿ Crypto", "value": "\n".join(cr_lines), "inline": True},
