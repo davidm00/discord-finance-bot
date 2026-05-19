@@ -1,127 +1,153 @@
 # Discord Finance Bot
 
-A scheduled GitHub Actions-driven finance report bot that posts a rich Discord **embed** twice per trading day (pre-market + post-market) and can also be run locally for testing.
+An AI-powered daily market intelligence bot that delivers pre-market briefings and post-market recaps to Discord. Built with Python, Claude AI, and GitHub Actions.
 
-It fetches market/crypto/news/political/contract data, asks Claude to write a plain-English briefing, parses a small "Tickers to Watch" section, and sends everything to Discord.
+## Features
 
-## What it posts (Discord embed)
+### 📊 Daily Reports (Pre-Market & Post-Market)
 
-Each run posts an embed containing:
+- **AI-Powered Analysis** — Claude Sonnet generates plain-English market narratives with bull/bear debate format for each recommended ticker
+- **Multi-Source Data** — Aggregates equities, crypto, news, political trades, government contracts, and earnings into a single briefing
+- **Source-Weighted News** — Headlines ranked by source reliability (Reuters > Bloomberg > CNBC > etc.) with event classification (geopolitical, earnings, M&A, regulatory, macro)
+- **Signal Tracking** — Logs every ticker recommendation to CSV with price-at-signal for historical backtesting
 
-- 🇺🇸 **Equities**: SPY / QQQ / DIA / VIX snapshot
-- ₿ **Crypto**: BTC / ETH / SOL + notable movers
-- 📰 **Top Headlines**: Finnhub + RSS sources
-- 🏛️ **Political Trades**: CapitolTrades scrape (best-effort)
-- 📋 **Gov Contracts**: USASpending.gov awards (best-effort)
-- 📅 **Upcoming Earnings**: Finnhub earnings calendar (filtered)
-- 🎯 **Tickers to Watch**: parsed from Claude response
+### 📈 What Each Report Contains
 
-All timestamps are labeled **ET** (Eastern Time). The report always includes a disclaimer.
+| Section | Source | Content |
+|---------|--------|---------|
+| 🇺🇸 Equities | yfinance + fallbacks | SPY, QQQ, DIA, VIX with daily % change |
+| ₿ Crypto | CoinGecko | BTC, ETH, SOL + notable altcoin movers |
+| 📰 Headlines | Finnhub + RSS (Reuters, Bloomberg, CNBC) | Top 5 weighted headlines with event type |
+| 🏛️ Political Trades | Capitol Trades scrape | Congressional stock disclosures > $25K |
+| 📋 Gov Contracts | USASpending.gov | Major federal awards with recurring flag |
+| 📅 Earnings | Finnhub calendar | Upcoming reports with EPS estimates |
+| 🎯 Tickers to Watch | Claude AI + parser | Bull/Bear cases, rating, confidence level |
 
-## Weekly Summary Report
+### 📅 Weekly Summary (Saturdays)
 
-Every Saturday at 8:00 AM ET, the bot posts a weekly wrap-up including:
+- Weekly performance for major indices and crypto (Mon open → Fri close + weekly high/low)
+- Week's dominant themes and biggest catalyst
+- Bot Scorecard — how previous BUY/SELL/HOLD/WATCH calls performed
+- Week Ahead outlook + fresh ticker watchlist
 
-- Weekly performance for SPY, QQQ, DIA, VIX, BTC, ETH, SOL
-  (Monday open → Friday close with weekly high/low)
-- Plain-English narrative of the week's dominant themes and catalysts
-- Biggest story of the week
-- Political trades and government contracts summary
-- Bot Scorecard: how this week's BUY/SELL/HOLD/WATCH calls performed
-- Week Ahead: 3-5 things to watch next week
-- Next Week Watchlist: fresh ticker calls based on weekly data
+### 🛡️ Pipeline Resilience
 
-The weekly report reads all daily reports posted that week via Discord history to build continuity and score previous calls.
+- **Multi-source fallback** — yfinance → Yahoo Chart API → Finnhub for every equity fetch
+- **HTTP caching** — SQLite-backed request cache with per-URL TTL rules
+- **Automatic retries** — Exponential backoff (tenacity) on all API calls
+- **Market calendar awareness** — Adjusts report title/behavior for pre-market, open, post-market, closed, and holidays
+- **Graceful degradation** — Any single data source failure won't crash the pipeline
 
-## How it runs
+## Architecture
 
-Workflow: `.github/workflows/report.yml`
-
-Scheduling is handled by **cron-job.org** (external cron service, free) which triggers GitHub Actions via `workflow_dispatch`:
-
-- **Pre-market**: 8:00 AM ET, Monday–Friday
-- **Post-market**: 4:15 PM ET, Monday–Friday
-- **Weekly summary**: 8:00 AM ET, Saturday
-
-The workflow accepts a `report_type` input (`daily` or `weekly`) to route between the daily report (`bot/report.py`) and weekly report (`bot/weekly_report.py`).
-
-Manual runs are also supported from the GitHub Actions tab via `workflow_dispatch`.
-
-The workflow installs dependencies from `requirements.txt` and caches pip (`~/.cache/pip`) between runs.
-
-## Required GitHub Secrets
-
-Configure these in repo settings → Actions → Secrets:
-
-- `DISCORD_WEBHOOK_URL` (required)
-- `ANTHROPIC_API_KEY` (for Claude analysis)
-- `FINNHUB_API_KEY` (news + earnings calendar)
-- `DISCORD_BOT_TOKEN` (for fetching prior reports/history)
-- `DISCORD_CHANNEL_ID` (for fetching prior reports/history)
-
-Secrets are only read via environment variables (never hardcoded).
-
-## Local testing (no key leaks)
-
-Local runs use a gitignored `.env.local` file in the repo root.
-
-### 1) Install deps
-
-```bash
-python -m pip install -r requirements.txt
+```
+cron-job.org (free) → GitHub Actions workflow_dispatch
+                        ↓
+              .github/workflows/report.yml
+                        ↓
+        ┌───────────────┴───────────────┐
+        │                               │
+   bot/report.py                bot/weekly_report.py
+   (daily pre/post)             (Saturday summary)
+        │
+   Parallel data fetch (6 sources)
+        │
+   Claude Sonnet analysis
+        │
+   Parse recommendations → Log signals
+        │
+   Discord webhook (2 embeds per report)
 ```
 
-### 2) Create `.env.local` (repo root; gitignored)
+## Schedule
 
-```env
+| Report | Time (ET) | Days |
+|--------|-----------|------|
+| Pre-Market Briefing | 8:00 AM | Mon–Fri |
+| Post-Market Recap | 4:15 PM | Mon–Fri |
+| Weekly Summary | 8:00 AM | Saturday |
+
+Scheduling via [cron-job.org](https://cron-job.org) triggering GitHub Actions `workflow_dispatch`.
+
+## Data Sources
+
+| Data | Source | Fallback |
+|------|--------|----------|
+| Equities | yfinance | Yahoo Chart API → Finnhub |
+| Crypto | CoinGecko API | — |
+| News | Finnhub + RSS (CNBC, Bloomberg, MarketWatch) | — |
+| Political trades | Capitol Trades (HTML scrape) | — |
+| Gov contracts | USASpending.gov API | — |
+| Earnings | Finnhub calendar | — |
+| Macro context | TNX, DXY, Fear & Greed Index | — |
+| Analysis | Claude Sonnet 4.6 (Anthropic API) | — |
+
+## Setup
+
+### Required GitHub Secrets
+
+Configure in repo Settings → Secrets and variables → Actions:
+
+| Secret | Purpose |
+|--------|---------|
+| `DISCORD_WEBHOOK_URL` | Posts reports to Discord |
+| `ANTHROPIC_API_KEY` | Claude AI analysis |
+| `FINNHUB_API_KEY` | News + earnings calendar |
+| `DISCORD_BOT_TOKEN` | Fetches previous reports for continuity |
+| `DISCORD_CHANNEL_ID` | Channel to read history from |
+
+### Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env.local (gitignored)
+cat > .env.local << EOF
 DISCORD_WEBHOOK_URL=...
 ANTHROPIC_API_KEY=...
 FINNHUB_API_KEY=...
 DISCORD_BOT_TOKEN=...
 DISCORD_CHANNEL_ID=...
+EOF
+
+# Run in DRY_RUN mode (full pipeline, no Discord post)
+DRY_RUN=1 python bot/report.py
+
+# Or on Windows PowerShell:
+$env:DRY_RUN="1"; python bot\report.py
 ```
 
-### 3) Run in DRY_RUN mode (recommended)
+DRY_RUN outputs to `local-output/latest_report.md` and `local-output/latest_claude_response.md`.
 
-DRY_RUN runs the full pipeline (fetches data, calls Claude, builds the embed) **but does not post to Discord**.
+### Running Tests
 
-PowerShell:
-```powershell
-$env:DRY_RUN="1"
-python bot\report.py
+```bash
+TEST_MOCK=1 python bot/test_runner.py    # Offline mock tests (15 tests)
+TEST_LIVE=1 python bot/test_runner.py    # Live API connectivity tests
 ```
 
-CMD:
-```bat
-set DRY_RUN=1
-python bot\report.py
-```
+## Security
 
-### Local output files
+- **Pre-commit hooks**: detect-secrets + gitleaks + private key detection
+- **CI scanning**: gitleaks + pip-audit on every push/PR (`.github/workflows/security.yml`)
+- **No secrets in code**: All credentials via environment variables / GitHub Secrets
+- **`.env.local` gitignored**: Never committed
 
-When `DRY_RUN=1` is set, the run writes:
+## Cost
 
-- `local-output/latest_report.md` — a Discord-style embed preview
-- `local-output/latest_claude_response.md` — the full Claude response text (useful for debugging parsing)
+| Service | Cost |
+|---------|------|
+| GitHub Actions | Free (public repo) |
+| cron-job.org | Free |
+| Claude API | ~$3-5/month (2 reports/day × 30 days) |
+| All data APIs | Free tier |
+| **Total** | **~$3-5/month** |
 
-`local-output/` is gitignored.
+## Design Principles
 
-### Optional debug flags
-
-- `PARSER_DEBUG=1` — prints extra info about how the "Tickers to Watch" section was found/parsed.
-
-## Data sources (current)
-
-- Equities: `yfinance`
-- Crypto: CoinGecko API
-- News: Finnhub general news + RSS feeds
-- Political trades: CapitolTrades (HTML scrape; best-effort)
-- Gov contracts: USASpending.gov (best-effort)
-- Earnings: Finnhub earnings calendar endpoint
-- Analysis: Anthropic Claude (model `claude-sonnet-4-6`)
-
-## Notes / Design principles
-
-- Degrades gracefully: a single API outage should not crash the whole report.
-- Verbose logs: everything prints to stdout for easy debugging in Actions logs.
-- Discord limits: embed payload is clamped to Discord size limits to avoid webhook 400s.
+- **Degrades gracefully** — Any single API outage won't crash the report
+- **Verbose logging** — Every step prints to stdout for GitHub Actions debugging
+- **Discord-aware** — Embeds split across messages to respect 6000 char limit
+- **Deterministic parsing** — Bull/Bear/Rating/Confidence extracted with fallback patterns
+- **Historical continuity** — Reads previous Discord reports to reference past calls

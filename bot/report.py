@@ -501,9 +501,10 @@ def main() -> int:
 
     # Strip "Tickers to Watch" section from analysis narrative since we display
     # the parsed version (with 🐂/🐻) separately in embed2.
-    # Claude uses varying formats: "## Tickers to Watch", "**📌 Tickers to Watch**", etc.
+    # Claude varies format heavily (##, **, random emojis like 📌🎯👀🔭📊), so we
+    # just look for "Tickers to Watch" on its own line with any prefix.
     analysis_narrative = re.split(
-        r'\n---\s*\n+\s*(?:\*{0,2})(?:#{1,3}\s*)?(?:📌|🎯)?\s*(?:\*{0,2})\s*Tickers to Watch',
+        r'\n+(?:---\s*\n+)?\s*(?:[#*]{0,4})\s*\S*\s*(?:\*{0,2})\s*Tickers to Watch',
         analysis,
         maxsplit=1
     )[0].rstrip()
