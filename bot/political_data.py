@@ -268,7 +268,7 @@ def fetch_congressional_trades(lookback_days: int = 7) -> list[dict[str, Any]]:
             ticker = ticker.split(":", 1)[0]
 
         ticker = ticker.strip().upper()
-        if not ticker or ticker == "N/A":
+        if not ticker:
             continue
 
         trade_type = ""

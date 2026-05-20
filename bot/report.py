@@ -435,7 +435,11 @@ def main() -> int:
         trade_lines = []
         for t in trades[:5]:
             ticker = str(t.get('ticker', '')).upper()
-            ticker_display = f"${ticker}" if ticker and ticker != "N/A" else t.get('company', '?')
+            if ticker and ticker != "N/A":
+                ticker_display = f"${ticker}"
+            else:
+                company = t.get('company', '').strip()
+                ticker_display = f"{company} (Non-stock asset)" if company else "Non-stock asset"
             trade_lines.append(
                 f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} {ticker_display} | {t.get('amount_range','').strip()} | published: {t.get('published_date','') or t.get('trade_date','').strip()}"
             )
