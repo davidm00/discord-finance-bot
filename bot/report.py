@@ -432,10 +432,13 @@ def main() -> int:
     correlations = (political_data or {}).get("correlations", []) if isinstance(political_data, dict) else []
 
     if trades:
-        trade_lines = [
-            f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} ${str(t.get('ticker','')).upper()} | {t.get('amount_range','').strip()} | published: {t.get('published_date','') or t.get('trade_date','').strip()}"
-            for t in trades[:5]
-        ]
+        trade_lines = []
+        for t in trades[:5]:
+            ticker = str(t.get('ticker', '')).upper()
+            ticker_display = f"${ticker}" if ticker and ticker != "N/A" else t.get('company', '?')
+            trade_lines.append(
+                f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} {ticker_display} | {t.get('amount_range','').strip()} | published: {t.get('published_date','') or t.get('trade_date','').strip()}"
+            )
         trades_value = "\n".join(trade_lines) if trade_lines else "No recent trades above $25K."
     else:
         trades_value = "No recent trades above $25K."
