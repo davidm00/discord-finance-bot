@@ -432,18 +432,46 @@ def main() -> int:
     correlations = (political_data or {}).get("correlations", []) if isinstance(political_data, dict) else []
 
     if trades:
-        trade_lines = []
-        for t in trades[:5]:
+        # Consolidate trades by politician + trade direction
+        from collections import OrderedDict
+        grouped = OrderedDict()
+        for t in trades:
+            politician = t.get('politician', '').strip()
+            party = t.get('party', '?').strip()
+            direction = str(t.get('trade_type', '?')).upper()
+            key = (politician, party, direction)
+            if key not in grouped:
+                grouped[key] = {"tickers": [], "non_stock_count": 0, "amounts": [], "published": ""}
             ticker = str(t.get('ticker', '')).upper()
             if ticker and ticker != "N/A":
-                ticker_display = f"${ticker}"
+                grouped[key]["tickers"].append(f"${ticker}")
             else:
-                company = t.get('company', '').strip()
-                ticker_display = f"{company} (Non-stock asset)" if company else "Non-stock asset"
+                grouped[key]["non_stock_count"] += 1
+            grouped[key]["amounts"].append(t.get('amount_range', '').strip())
+            grouped[key]["published"] = t.get('published_date', '') or t.get('trade_date', '').strip()
+
+        trade_lines = []
+        for (politician, party, direction), info in grouped.items():
+            # Build ticker list: real tickers first, then non-stock summary
+            parts = list(info["tickers"][:6])
+            if len(info["tickers"]) > 6:
+                parts.append(f"+{len(info['tickers']) - 6} more")
+            if info["non_stock_count"] > 0:
+                ns = info["non_stock_count"]
+                parts.append(f"{ns} non-stock asset{'s' if ns > 1 else ''}")
+            tickers_str = ", ".join(parts) if parts else "Non-stock assets"
+
+            total_count = len(info["tickers"]) + info["non_stock_count"]
+            count_label = f" ({total_count} trades)" if total_count > 1 else ""
+
+            # Amount range: show lowest–highest if mixed
+            unique_amounts = list(dict.fromkeys(info["amounts"]))
+            amount_display = unique_amounts[0] if len(unique_amounts) == 1 else f"{unique_amounts[0]} to {unique_amounts[-1]}"
+
             trade_lines.append(
-                f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} {ticker_display} | {t.get('amount_range','').strip()} | published: {t.get('published_date','') or t.get('trade_date','').strip()}"
+                f"{politician} ({party}): {direction} {tickers_str}{count_label} | {amount_display} | published: {info['published']}"
             )
-        trades_value = "\n".join(trade_lines) if trade_lines else "No recent trades above $25K."
+        trades_value = "\n".join(trade_lines[:8]) if trade_lines else "No recent trades above $25K."
     else:
         trades_value = "No recent trades above $25K."
 
