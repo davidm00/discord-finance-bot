@@ -13,4 +13,5 @@ local-output/
 
 data/
 
-research-output/week_messages.json
+research-output/
+week_messages.json
