@@ -212,9 +212,30 @@ def fetch_weekly_market_performance() -> dict[str, dict[str, Any]]:
 
     print("[weekly] Fetching weekly market performance...")
 
+    # Calculate most recent Monday-Friday range
+    # If today is Saturday/Sunday, the week just ended is Mon-Fri
+    # If called on a weekday, get the current week's Mon through today
+    now_et = datetime.now(ET_TZ)
+    today = now_et.date()
+    weekday = today.weekday()  # Mon=0, Sun=6
+
+    if weekday >= 5:  # Saturday(5) or Sunday(6)
+        # Most recent Friday
+        friday = today - __import__('datetime').timedelta(days=(weekday - 4))
+        monday = friday - __import__('datetime').timedelta(days=4)
+    else:
+        # Current week
+        monday = today - __import__('datetime').timedelta(days=weekday)
+        friday = today
+
+    # yfinance end is exclusive, add 1 day
+    end_date = friday + __import__('datetime').timedelta(days=1)
+
+    print(f"[weekly] Week range: {monday} to {friday}")
+
     for t in tickers:
         try:
-            df = yf.download(t, period="5d", interval="1d", progress=False)
+            df = yf.download(t, start=str(monday), end=str(end_date), interval="1d", progress=False)
             if df is None or df.empty:
                 continue
 
@@ -474,6 +495,7 @@ def main() -> int:
     print(f"[weekly] Prompt token estimate: ~{len(user_prompt)//4} tokens")
 
     analysis = ""
+    recs = []
     if not api_key:
         print("[weekly] WARNING: ANTHROPIC_API_KEY not set; skipping Claude analysis.")
         analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
@@ -517,6 +539,14 @@ def main() -> int:
 
             print(f"[weekly] Response received: {len(analysis)} chars")
 
+            # Parse tickers BEFORE truncation (truncation may cut the tickers section)
+            print("[weekly] Parsing ticker recommendations...")
+            try:
+                recs = parse_recommendations(analysis)
+            except Exception as exc:
+                print(f"[weekly] WARNING: parser failed: {exc}")
+                recs = []
+
             # Pre-flight: ensure analysis fits embed description (max 4096, target 3800)
             if len(analysis) > 3800:
                 print(f"[weekly] WARNING: Analysis exceeds 3800 chars, truncating at section boundary")
@@ -525,13 +555,8 @@ def main() -> int:
             print(f"[weekly] WARNING: Claude call failed: {exc}")
             analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
-    print("[weekly] Parsing ticker recommendations...")
-    recs = []
-    try:
-        recs = parse_recommendations(analysis)
-    except Exception as exc:
-        print(f"[weekly] WARNING: parser failed: {exc}")
-        recs = []
+    if not recs:
+        print("[weekly] No recommendations parsed from analysis.")
 
     # Signal logging
     if recs:
