@@ -90,6 +90,24 @@ def _clamp_text(s: str, limit: int, ellipsis: str = "…") -> str:
     return s[: limit - len(ellipsis)].rstrip() + ellipsis
 
 
+def _section_aware_truncate(text: str, limit: int) -> str:
+    """Truncate at the last section boundary (--- or **Header**) before the limit."""
+    import re as _re
+    if len(text) <= limit:
+        return text
+    boundaries = []
+    for m in _re.finditer(r"\n---\n|\n\*\*[^*]+\*\*", text[:limit]):
+        boundaries.append(m.start())
+    if boundaries:
+        cut_at = boundaries[-1]
+        if cut_at > limit * 0.5:
+            return text[:cut_at].rstrip()
+    last_nl = text.rfind("\n", 0, limit)
+    if last_nl > limit * 0.5:
+        return text[:last_nl].rstrip()
+    return text[:limit - 1].rstrip() + "…"
+
+
 def _embed_char_count(embed: dict) -> int:
     title = str(embed.get("title") or "")
     desc = str(embed.get("description") or "")
@@ -429,7 +447,11 @@ def main() -> int:
         "happened, not just what happened. Reference specific data points from the week. "
         "When the previous daily reports are available, synthesize them into a coherent "
         "weekly narrative and explicitly score any ticker calls the bot made — did the "
-        "BUY/WATCH/HOLD calls play out? Be honest if they didn't. Always use ET timestamps."
+        "BUY/WATCH/HOLD calls play out? Be honest if they didn't. Always use ET timestamps.\n\n"
+        "CRITICAL LENGTH CONSTRAINT: Your ENTIRE response must be under 3800 characters total. "
+        "This is a quick-read weekly summary — not a deep research report. "
+        "Each section should be 1-2 short paragraphs MAX. "
+        "Use **bold** for section headers (not # markdown). Separate sections with ---."
     )
 
     print("[weekly] Building Claude prompt...")
@@ -463,7 +485,7 @@ def main() -> int:
             print("[claude] Prompt caching enabled on system prompt")
             msg = client.messages.create(
                 model=DEFAULT_MODEL,
-                max_tokens=1800,
+                max_tokens=2000,
                 system=[
                     {
                         "type": "text",
@@ -494,6 +516,11 @@ def main() -> int:
                 analysis = analysis.rstrip() + "\n" + DISCLAIMER_LINE
 
             print(f"[weekly] Response received: {len(analysis)} chars")
+
+            # Pre-flight: ensure analysis fits embed description (max 4096, target 3800)
+            if len(analysis) > 3800:
+                print(f"[weekly] WARNING: Analysis exceeds 3800 chars, truncating at section boundary")
+                analysis = _section_aware_truncate(analysis, 3800)
         except Exception as exc:
             print(f"[weekly] WARNING: Claude call failed: {exc}")
             analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
@@ -535,11 +562,44 @@ def main() -> int:
     contracts = (political or {}).get("contracts") or []
 
     if trades:
-        trade_lines = [
-            f"{t.get('politician','').strip()} ({t.get('party','?').strip()}): {str(t.get('trade_type','?')).upper()} ${str(t.get('ticker','')).upper()} | {t.get('amount_range','').strip()} | {t.get('trade_date','').strip()}"
-            for t in trades[:8]
-        ]
-        political_value = "\n".join(trade_lines) if trade_lines else "No notable trades this week."
+        # Consolidate trades by politician + trade direction (same as daily report)
+        from collections import OrderedDict
+        grouped = OrderedDict()
+        for t in trades:
+            politician = t.get('politician', '').strip()
+            party = t.get('party', '?').strip()
+            direction = str(t.get('trade_type', '?')).upper()
+            key = (politician, party, direction)
+            if key not in grouped:
+                grouped[key] = {"tickers": [], "non_stock_count": 0, "amounts": [], "date": ""}
+            ticker = str(t.get('ticker', '')).upper()
+            if ticker and ticker != "N/A":
+                grouped[key]["tickers"].append(f"${ticker}")
+            else:
+                grouped[key]["non_stock_count"] += 1
+            grouped[key]["amounts"].append(t.get('amount_range', '').strip())
+            grouped[key]["date"] = t.get('published_date', '') or t.get('trade_date', '').strip()
+
+        trade_lines = []
+        for (politician, party, direction), info in grouped.items():
+            parts = list(info["tickers"][:6])
+            if len(info["tickers"]) > 6:
+                parts.append(f"+{len(info['tickers']) - 6} more")
+            if info["non_stock_count"] > 0:
+                ns = info["non_stock_count"]
+                parts.append(f"{ns} non-stock asset{'s' if ns > 1 else ''}")
+            tickers_str = ", ".join(parts) if parts else "Non-stock assets"
+
+            total_count = len(info["tickers"]) + info["non_stock_count"]
+            count_label = f" ({total_count} trades)" if total_count > 1 else ""
+
+            unique_amounts = list(dict.fromkeys(info["amounts"]))
+            amount_display = unique_amounts[0] if len(unique_amounts) == 1 else f"{unique_amounts[0]} to {unique_amounts[-1]}"
+
+            trade_lines.append(
+                f"{politician} ({party}): {direction} {tickers_str}{count_label} | {amount_display} | {info['date']}"
+            )
+        political_value = "\n".join(trade_lines[:8]) if trade_lines else "No notable trades this week."
     else:
         political_value = "No notable trades this week."
 
