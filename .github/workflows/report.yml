@@ -139,11 +139,12 @@ jobs:
 
       - name: Upload signals CSV as artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.guard.outputs.should_run == 'true'
         with:
           name: signals-csv-${{ github.run_number }}
           path: data/signals.csv
           retention-days: 90
+          if-no-files-found: warn
 
   weekly-report:
     runs-on: ubuntu-latest
@@ -238,8 +239,9 @@ jobs:
 
       - name: Upload signals CSV as artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.guard.outputs.should_run == 'true'
         with:
           name: signals-csv-weekly-${{ github.run_number }}
           path: data/signals.csv
           retention-days: 90
+          if-no-files-found: warn

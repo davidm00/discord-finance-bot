@@ -339,10 +339,17 @@ def read_weekly_signals() -> list[dict[str, str]]:
 
     print(f"[weekly] Read {len(signals)} signals from CSV for week of {monday_str}")
 
-    # Fetch current prices for unique tickers (batch)
-    unique_tickers = list(set(s.get("ticker", "") for s in signals if s.get("ticker")))
+    # Fetch current prices for unique tickers (batch, capped at 15)
+    seen: set[str] = set()
+    unique_tickers: list[str] = []
+    for s in reversed(signals):
+        t = s.get("ticker", "").upper().strip()
+        if t and t not in seen:
+            seen.add(t)
+            unique_tickers.append(t)
+
     current_prices: dict[str, float] = {}
-    for ticker in unique_tickers:
+    for ticker in unique_tickers[:15]:
         try:
             t = yf.Ticker(ticker)
             hist = t.history(period="2d")

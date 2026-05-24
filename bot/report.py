@@ -53,18 +53,31 @@ def _read_recent_signals(days: int = 5) -> list[dict[str, str]]:
             for row in reader:
                 if row.get("date_et", "") >= cutoff:
                     signals.append(row)
-    except Exception:
+    except Exception as exc:
+        print(f"[report] WARNING: failed to read signals.csv: {exc}")
         return []
 
     if not signals:
         return []
 
-    # Fetch current prices for unique tickers
-    unique_tickers = list(set(s.get("ticker", "") for s in signals if s.get("ticker")))
+    # Deduplicate tickers preserving most-recent-first order
+    seen: set[str] = set()
+    unique_tickers: list[str] = []
+    for s in reversed(signals):
+        t = s.get("ticker", "").upper().strip()
+        if t and t not in seen:
+            seen.add(t)
+            unique_tickers.append(t)
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        print("[report] WARNING: yfinance not available for signal enrichment")
+        return signals
+
     current_prices: dict[str, float] = {}
     for ticker in unique_tickers[:10]:  # Cap at 10 to limit API calls
         try:
-            import yfinance as yf
             t = yf.Ticker(ticker)
             hist = t.history(period="2d")
             if hist is not None and not hist.empty:

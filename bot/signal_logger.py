@@ -86,8 +86,9 @@ def log_signal(
 def log_recommendations(recs: list[dict], report_type: str) -> int:
     """Log a list of parsed recommendations. Returns count logged."""
     count = 0
+    price_cache: dict[str, float | None] = {}
     for r in recs:
-        ticker = r.get("ticker", "").strip()
+        ticker = r.get("ticker", "").strip().upper()
         action = r.get("rating", "").strip()
         confidence = r.get("confidence", "").strip()
         reasoning = r.get("reason", "").strip()
@@ -95,7 +96,9 @@ def log_recommendations(recs: list[dict], report_type: str) -> int:
         if not ticker or not action:
             continue
 
-        price = fetch_price_for_ticker(ticker)
+        if ticker not in price_cache:
+            price_cache[ticker] = fetch_price_for_ticker(ticker)
+        price = price_cache[ticker]
         log_signal(ticker, action, confidence, price, report_type, reasoning)
         count += 1
 
