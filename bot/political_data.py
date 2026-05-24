@@ -368,24 +368,24 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
     print("Fetching government contracts from USASpending.gov...", file=sys.stdout)
 
     today = _now_et().date()
-    start = today - timedelta(days=30)
+    start = today - timedelta(days=7)
 
     body = {
         "filters": {
             "time_period": [{"start_date": start.strftime("%Y-%m-%d"), "end_date": today.strftime("%Y-%m-%d")}],
             "award_type_codes": ["A", "B", "C", "D"],
-            "award_amounts": [{"lower_bound": 50_000_000}],
+            "award_amounts": [{"lower_bound": 10_000_000}],
         },
         "fields": [
             "Award ID",
             "Recipient Name",
             "Award Amount",
-            "Award Date",
+            "Start Date",
+            "Last Modified Date",
             "Awarding Agency",
             "Description",
-            "Place of Performance State Code",
         ],
-        "sort": "Award Amount",
+        "sort": "Start Date",
         "order": "desc",
         "limit": 20,
         "page": 1,
@@ -445,7 +445,7 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
             recipient = str(r.get("Recipient Name") or "").strip()
             agency = str(r.get("Awarding Agency") or "").strip()
             desc = str(r.get("Description") or "").strip()
-            award_date = str(r.get("Award Date") or "").strip()
+            start_date = str(r.get("Start Date") or "").strip()
             amt = r.get("Award Amount")
             amt_f = float(amt) if amt is not None else None
 
@@ -464,7 +464,7 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
                     "recipient": recipient,
                     "amount": amt_f,
                     "amount_human": _human_money(amt_f),
-                    "date": award_date,
+                    "date": start_date,
                     "agency": agency,
                     "description": desc,
                 }
@@ -476,18 +476,7 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
         print("WARNING: No major contracts found after filtering.", file=sys.stderr)
         return []
 
-    # Prioritize fresh contracts over stale large ones
-    # Score: newer date = higher priority, with amount as tiebreaker
-    for c in contracts:
-        try:
-            days_old = (today - datetime.strptime(c.get("date", ""), "%Y-%m-%d").date()).days
-        except (ValueError, TypeError):
-            days_old = 30
-        # Freshness score: 0-30 (30 = today, 0 = 30 days old)
-        c["_freshness"] = max(0, 30 - days_old)
-
-    # Sort by freshness first, then amount as tiebreaker
-    contracts.sort(key=lambda x: (x.get("_freshness", 0), float(x.get("amount") or 0.0)), reverse=True)
+    # Already sorted by Start Date desc from API; just cap to 10
     contracts = contracts[:10]
 
     # Tag recurring vs new contracts
