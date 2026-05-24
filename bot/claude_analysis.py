@@ -28,6 +28,7 @@ def generate_analysis(
     earnings: list[dict[str, Any]] | None,
     report_type: str,
     macro_context: dict[str, Any] | None = None,
+    recent_signals: list[dict[str, str]] | None = None,
 ) -> str:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -346,6 +347,23 @@ def generate_analysis(
 
     if prev_block:
         sections.append(prev_block)
+
+    # Recent signal performance — helps Claude calibrate future picks
+    if recent_signals:
+        sig_lines = [
+            "YOUR RECENT SIGNAL PERFORMANCE (use this to calibrate today's picks):",
+            "Date | Ticker | Rating | Entry Price | Current Price | P&L",
+        ]
+        for s in recent_signals:
+            sig_lines.append(
+                f"{s.get('date_et','')} | {s.get('ticker','')} | {s.get('action','')} | "
+                f"${s.get('price_at_signal','N/A')} | ${s.get('current_price','N/A')} | {s.get('pnl_pct','N/A')}"
+            )
+        sig_lines.append(
+            "If re-recommending a ticker, reference your prior call and whether the thesis is playing out. "
+            "If a prior call was wrong, acknowledge it briefly and explain what changed."
+        )
+        sections.append("\n".join(sig_lines))
 
     full_prompt = "\n\n".join(sections + [analysis_instruction, source_weight_instruction, event_classification_instruction, ticker_instruction])
 

@@ -431,7 +431,11 @@ def build_weekly_prompt(
         lines.append(
             "Use these EXACT prices in the Bot Scorecard — do not approximate. "
             "Entry Price is what the ticker was trading at when the call was made. "
-            "Current Price is Friday's close."
+            "Current Price is Friday's close. "
+            "ALSO use this performance history when making Tickers to Watch Next Week picks: "
+            "if a prior thesis played out, say whether it has further room to run. "
+            "If you were wrong, acknowledge it and recalibrate your conviction. "
+            "Do NOT repeat a failed thesis without new evidence supporting it."
         )
 
     # 3) Headlines

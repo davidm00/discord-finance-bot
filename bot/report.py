@@ -29,10 +29,68 @@ from market_data import fetch_market_data, fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
-from signal_logger import log_recommendations
+from signal_logger import log_recommendations, CSV_PATH
 
 
 ET_TZ = pytz.timezone("America/New_York")
+
+
+def _read_recent_signals(days: int = 5) -> list[dict[str, str]]:
+    """Read last N days of signals from CSV, enrich with current prices."""
+    import csv
+    from datetime import timedelta
+
+    if not os.path.isfile(CSV_PATH):
+        return []
+
+    now_et = datetime.now(ET_TZ)
+    cutoff = (now_et - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    signals = []
+    try:
+        with open(CSV_PATH, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("date_et", "") >= cutoff:
+                    signals.append(row)
+    except Exception:
+        return []
+
+    if not signals:
+        return []
+
+    # Fetch current prices for unique tickers
+    unique_tickers = list(set(s.get("ticker", "") for s in signals if s.get("ticker")))
+    current_prices: dict[str, float] = {}
+    for ticker in unique_tickers[:10]:  # Cap at 10 to limit API calls
+        try:
+            import yfinance as yf
+            t = yf.Ticker(ticker)
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                current_prices[ticker] = round(float(hist["Close"].iloc[-1]), 2)
+        except Exception:
+            pass
+
+    for s in signals:
+        ticker = s.get("ticker", "")
+        entry_str = s.get("price_at_signal", "")
+        if ticker in current_prices and entry_str and entry_str != "N/A":
+            try:
+                entry = float(entry_str)
+                current = current_prices[ticker]
+                pnl_pct = ((current - entry) / entry) * 100.0
+                s["current_price"] = f"{current:.2f}"
+                s["pnl_pct"] = f"{pnl_pct:+.2f}%"
+            except (ValueError, ZeroDivisionError):
+                s["current_price"] = "N/A"
+                s["pnl_pct"] = "N/A"
+        else:
+            s["current_price"] = "N/A"
+            s["pnl_pct"] = "N/A"
+
+    print(f"[report] Read {len(signals)} recent signals ({len(current_prices)} prices fetched)")
+    return signals
 
 
 def _ensure_utf8_console() -> None:
@@ -382,6 +440,10 @@ def main() -> int:
         return 0
 
     print("[report] All data fetched. Starting Claude analysis...")
+
+    # Read recent signal performance for feedback loop
+    recent_signals = _read_recent_signals(days=5)
+
     analysis = generate_analysis(
         market_data=market_data,
         crypto_data=crypto_data,
@@ -391,6 +453,7 @@ def main() -> int:
         earnings=earnings,
         report_type=report_type,
         macro_context=macro_context,
+        recent_signals=recent_signals,
     )
 
     analysis = _enforce_disclaimer(analysis)
