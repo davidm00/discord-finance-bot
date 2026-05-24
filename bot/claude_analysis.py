@@ -220,25 +220,11 @@ def generate_analysis(
         "Flag any of these tickers that appear in today's news, contracts, or political trades."
     )
 
-    # (7) Previous reports
+    # (7) Previous reports — use structured extraction for token efficiency
     prev_block = ""
     if previous_reports:
-        parts = ["Previous report context:"]
-        for pr in previous_reports[:2]:
-            rt = pr.get("report_type") or "unknown"
-            ts = pr.get("timestamp_et") or ""
-            analysis = pr.get("analysis") or ""
-            fields = pr.get("fields") or {}
-            # light summary
-            field_summary = "; ".join(f"{k}: {str(v)[:120]}" for k, v in list(fields.items())[:6])
-            parts.append(f"--- {rt} from {ts} ---")
-            parts.append(str(analysis).strip())
-            parts.append(f"Key data from that report: {field_summary}")
-            parts.append("---")
-        parts.append(
-            "When writing today's report, reference what was flagged previously and whether those predictions or signals played out."
-        )
-        prev_block = "\n".join(parts)
+        from history_fetcher import format_prior_context_for_prompt
+        prev_block = format_prior_context_for_prompt(previous_reports)
 
     # System prompt + instructions
     if report_type == "pre-market":
@@ -251,7 +237,11 @@ def generate_analysis(
             "Instead of 'macro headwinds', say 'the broader economy is creating problems'. Always "
             "explain WHY something matters, not just WHAT happened. When you reference previous "
             "reports, explicitly note what was predicted and whether it played out. Always include "
-            "ET timestamps. Keep it short: target 350–550 words total."
+            "ET timestamps.\n\n"
+            "CRITICAL LENGTH CONSTRAINT: Your ENTIRE response must be under 2800 characters total "
+            "(including tickers section). This is a quick-read morning brief — not a deep dive. "
+            "Each paragraph should be 2-3 sentences MAX. Each ticker entry should be under 250 characters. "
+            "Use **bold** for section headers (not # markdown). Separate sections with ---."
         )
         analysis_instruction = (
             "Write a 4-paragraph pre-market briefing (keep each paragraph 2–3 sentences max):\n"
@@ -271,7 +261,11 @@ def generate_analysis(
             "to lock in gains'. Instead of 'oversold conditions', say 'the stock has dropped a lot "
             "and may be due for a bounce'. Always explain WHY something matters, not just WHAT "
             "happened. When you reference previous reports, explicitly note what was predicted and "
-            "whether it played out. Always include ET timestamps. Keep it short: target 350–550 words total."
+            "whether it played out. Always include ET timestamps.\n\n"
+            "CRITICAL LENGTH CONSTRAINT: Your ENTIRE response must be under 2800 characters total "
+            "(including tickers section). This is a quick-read end-of-day recap — not a deep dive. "
+            "Each paragraph should be 2-3 sentences MAX. Each ticker entry should be under 250 characters. "
+            "Use **bold** for section headers (not # markdown). Separate sections with ---."
         )
         analysis_instruction = (
             "Write a 4-paragraph post-market recap (keep each paragraph 2–3 sentences max):\n"
@@ -364,7 +358,7 @@ def generate_analysis(
         print("[claude] Prompt caching enabled on system prompt")
         msg = client.messages.create(
             model=DEFAULT_MODEL,
-            max_tokens=1200,
+            max_tokens=1500,
             system=[
                 {
                     "type": "text",

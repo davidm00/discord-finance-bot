@@ -87,6 +87,141 @@ def _extract_reports(messages: list[dict[str, Any]], limit: int, since_dt_utc: d
     return reports
 
 
+import re
+
+
+def extract_structured_summary(report: dict[str, Any]) -> dict[str, Any]:
+    """Extract key structured data from a previous report for continuity context.
+
+    Returns a compact dict with prices, tickers watched, and predictions —
+    suitable for inclusion in Claude prompt without excessive token usage.
+    """
+    summary: dict[str, Any] = {
+        "report_type": report.get("report_type", "unknown"),
+        "timestamp_et": report.get("timestamp_et", ""),
+        "prices": {},
+        "tickers_watched": [],
+        "predictions": [],
+        "key_theme": "",
+    }
+
+    fields = report.get("fields") or {}
+    analysis = report.get("analysis") or ""
+
+    # Extract equity prices from fields
+    eq_field = fields.get("\U0001f1fa\U0001f1f8 Equities", "")  # 🇺🇸
+    for line in eq_field.split("\n"):
+        m = re.match(r"(\w+):\s*\$?([\d,.]+)\s*\(([▲▼])\s*([\d.]+)%\)", line)
+        if m:
+            summary["prices"][m.group(1)] = {
+                "price": m.group(2),
+                "direction": "up" if m.group(3) == "\u25b2" else "down",
+                "pct": m.group(4),
+            }
+
+    # Extract crypto prices from fields
+    cr_field = fields.get("\u20bf Crypto", "") or fields.get("₿ Crypto", "")
+    for line in cr_field.split("\n"):
+        m = re.match(r"(\w+):\s*\$?([\d,.]+)\s*\(([▲▼])\s*([\d.]+)%\)", line)
+        if m:
+            summary["prices"][m.group(1)] = {
+                "price": m.group(2),
+                "direction": "up" if m.group(3) == "\u25b2" else "down",
+                "pct": m.group(4),
+            }
+
+    # Extract tickers watched from analysis text
+    ticker_pattern = re.compile(
+        r"\*\*(\w{1,5})\s*[—–-]\s*.*?\*\*.*?Rating:\s*(BUY|SELL|HOLD|WATCH)",
+        re.DOTALL,
+    )
+    # Common words that aren't tickers
+    non_tickers = {"Pre", "Post", "The", "This", "What", "How", "Why", "When", "Bull", "Bear"}
+    for match in ticker_pattern.finditer(analysis):
+        sym = match.group(1)
+        if sym not in non_tickers and sym.isupper():
+            summary["tickers_watched"].append({
+                "ticker": sym,
+                "rating": match.group(2),
+            })
+
+    # Extract predictions from "Tomorrow Watch" or "What to Watch" sections
+    watch_pattern = re.compile(
+        r"(?:Tomorrow Watch|What to Watch)[*\s]*\n([\s\S]*?)(?:\n---|\n\*\*|\Z)",
+        re.IGNORECASE,
+    )
+    watch_match = watch_pattern.search(analysis)
+    if watch_match:
+        for line in watch_match.group(1).strip().split("\n"):
+            line = line.strip()
+            if line and (line[0].isdigit() or line.startswith("-") or line.startswith("•")):
+                cleaned = re.sub(r"^[\d]+[.)]\s*", "", line).strip()
+                cleaned = re.sub(r"^[-•]\s*", "", cleaned).strip()
+                if cleaned and len(cleaned) > 20:
+                    summary["predictions"].append(cleaned[:200])
+
+    # Extract key theme (first substantive paragraph, skip headers)
+    paragraphs = [p.strip() for p in analysis.split("\n\n") if p.strip() and not p.strip().startswith("---")]
+    for para in paragraphs:
+        clean = para.replace("**", "").replace("#", "").strip()
+        # Remove leading emoji
+        clean = re.sub(r"^[\U0001f300-\U0001fad6\u2600-\u27bf\U0001f900-\U0001f9ff]+\s*", "", clean)
+        # Skip header-like lines (dates, briefing titles)
+        if any(x in clean.lower() for x in ["briefing", "recap", "summary", "market wrap"]):
+            continue
+        # Take the first real sentence from multi-line paragraphs
+        first_line = clean.split("\n")[0].strip()
+        if len(first_line) > 50:
+            first_sentence = first_line.split(".")[0] + "." if "." in first_line else first_line[:150]
+            summary["key_theme"] = first_sentence[:200]
+            break
+
+    return summary
+
+
+def format_prior_context_for_prompt(reports: list[dict[str, Any]]) -> str:
+    """Format previous reports into a concise structured context block for Claude.
+
+    Uses ~400-600 chars instead of ~8000 chars of raw text.
+    """
+    if not reports:
+        return ""
+
+    lines = ["PREVIOUS REPORT CONTEXT (reference these for continuity):"]
+
+    for r in reports[:2]:
+        summary = extract_structured_summary(r)
+        rt = summary["report_type"]
+        ts = summary["timestamp_et"]
+        lines.append(f"\n--- {rt} from {ts} ---")
+
+        # Prices
+        if summary["prices"]:
+            price_parts = []
+            for sym, data in summary["prices"].items():
+                price_parts.append(f"{sym}: ${data['price']} ({data['direction']} {data['pct']}%)")
+            lines.append(f"Closing data: {'; '.join(price_parts)}")
+
+        # Tickers watched
+        if summary["tickers_watched"]:
+            tw = ", ".join(f"{t['ticker']} ({t['rating']})" for t in summary["tickers_watched"])
+            lines.append(f"Tickers flagged: {tw}")
+
+        # Predictions
+        valid_predictions = [p for p in summary["predictions"] if p.strip()]
+        if valid_predictions:
+            lines.append("Predictions made:")
+            for p in valid_predictions[:3]:
+                lines.append(f"  - {p}")
+
+        # Theme
+        if summary["key_theme"]:
+            lines.append(f"Key theme: {summary['key_theme']}")
+
+    lines.append("\nWhen writing today's report, note what was flagged previously and whether those predictions or signals played out.")
+    return "\n".join(lines)
+
+
 def fetch_previous_reports() -> list[dict[str, Any]]:
     token = (os.getenv("DISCORD_BOT_TOKEN") or "").strip()
     channel_id = (os.getenv("DISCORD_CHANNEL_ID") or "").strip()

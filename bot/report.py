@@ -417,8 +417,9 @@ def main() -> int:
 
     # Headlines field
     if headlines:
+        import html as html_mod
         hl_lines = [
-            f"[{h.get('headline','').strip()}]({h.get('url','').strip()}) — {h.get('source','').strip()}"
+            f"[{html_mod.unescape(h.get('headline','').strip())}]({h.get('url','').strip()}) — {h.get('source','').strip()}"
             for h in headlines[:5]
             if (h.get("headline") and h.get("url"))
         ]
@@ -489,10 +490,17 @@ def main() -> int:
     else:
         contracts_value = "No major contracts found."
 
-    # Earnings field
+    # Earnings field — filter stale entries for post-market reports
     if earnings:
+        filtered_earnings = earnings
+        if report_type == "post-market":
+            # Post-market: exclude BMO earnings from today (already reported)
+            filtered_earnings = [
+                e for e in earnings
+                if not (str(e.get("date", "")) == date_et and str(e.get("time", "")).upper() == "BMO")
+            ]
         e_lines = []
-        for e in earnings:
+        for e in filtered_earnings:
             sym = str(e.get("symbol") or "").upper()
             d = str(e.get("date") or "")
             t = str(e.get("time") or "Unknown")
@@ -552,6 +560,7 @@ def main() -> int:
         {"name": "📅 Upcoming Earnings", "value": earnings_value, "inline": False},
     ]
     embed2 = {
+        "title": "📋 Market Data & Signals",
         "color": color,
         "fields": embed2_fields,
         "footer": {"text": f"Data fetched at {fetched_at_et} | Personal use only"},

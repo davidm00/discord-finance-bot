@@ -476,8 +476,18 @@ def fetch_government_contracts() -> list[dict[str, Any]]:
         print("WARNING: No major contracts found after filtering.", file=sys.stderr)
         return []
 
-    # Sort by amount descending, cap to 10
-    contracts.sort(key=lambda x: float(x.get("amount") or 0.0), reverse=True)
+    # Prioritize fresh contracts over stale large ones
+    # Score: newer date = higher priority, with amount as tiebreaker
+    for c in contracts:
+        try:
+            days_old = (today - datetime.strptime(c.get("date", ""), "%Y-%m-%d").date()).days
+        except (ValueError, TypeError):
+            days_old = 30
+        # Freshness score: 0-30 (30 = today, 0 = 30 days old)
+        c["_freshness"] = max(0, 30 - days_old)
+
+    # Sort by freshness first, then amount as tiebreaker
+    contracts.sort(key=lambda x: (x.get("_freshness", 0), float(x.get("amount") or 0.0)), reverse=True)
     contracts = contracts[:10]
 
     # Tag recurring vs new contracts

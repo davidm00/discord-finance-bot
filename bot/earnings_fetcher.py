@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
+import pytz
 import requests
 
 
@@ -116,7 +117,8 @@ def fetch_upcoming_earnings() -> list[dict[str, Any]]:
         print("[earnings_fetcher] WARNING: FINNHUB_API_KEY not set; skipping earnings.")
         return []
 
-    today = date.today()
+    ET_TZ = pytz.timezone("America/New_York")
+    today = datetime.now(ET_TZ).date()
     to_date = today + timedelta(days=3)
 
     print(f"[earnings_fetcher] Fetching earnings calendar from {today} to {to_date}...")
