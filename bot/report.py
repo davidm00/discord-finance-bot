@@ -189,6 +189,27 @@ def _clamp_text(s: str, limit: int, ellipsis: str = "…") -> str:
     return s[: limit - len(ellipsis)].rstrip() + ellipsis
 
 
+def _section_aware_truncate(text: str, limit: int) -> str:
+    """Truncate at the last section boundary (--- or **Header**) before the limit."""
+    if len(text) <= limit:
+        return text
+    # Find all section boundaries within the limit
+    import re as _re
+    boundaries = []
+    for m in _re.finditer(r"\n---\n|\n\*\*[^*]+\*\*", text[:limit]):
+        boundaries.append(m.start())
+    if boundaries:
+        # Cut at last clean boundary
+        cut_at = boundaries[-1]
+        if cut_at > limit * 0.5:  # Only use boundary if it keeps >50% of content
+            return text[:cut_at].rstrip()
+    # Fallback: cut at last newline before limit
+    last_nl = text.rfind("\n", 0, limit)
+    if last_nl > limit * 0.5:
+        return text[:last_nl].rstrip()
+    return text[:limit - 1].rstrip() + "…"
+
+
 def _embed_char_count(embed: dict) -> int:
     title = str(embed.get("title") or "")
     desc = str(embed.get("description") or "")
@@ -367,6 +388,12 @@ def main() -> int:
 
     analysis = _enforce_disclaimer(analysis)
     print(f"[report] Claude response length: {len(analysis)} chars")
+
+    # Pre-flight: ensure analysis fits embed description (max 4096, target 3800 for safety)
+    ANALYSIS_TARGET_LIMIT = 3800
+    if len(analysis) > ANALYSIS_TARGET_LIMIT:
+        print(f"[report] WARNING: Analysis exceeds {ANALYSIS_TARGET_LIMIT} chars, truncating at section boundary")
+        analysis = _section_aware_truncate(analysis, ANALYSIS_TARGET_LIMIT)
 
     print("[report] Parsing ticker recommendations...")
     recs = parse_recommendations(analysis)

@@ -112,12 +112,15 @@ def _fetch_finnhub_quote_fallback(symbol: str) -> dict | None:
 @api_retry
 def fetch_equity_with_fallback(symbol: str) -> dict | None:
     """Fetch equity data: yfinance → Yahoo chart API → Finnhub → None."""
+    now_et = datetime.now(ET_TZ)
+    is_premarket = now_et.hour < 9 or (now_et.hour == 9 and now_et.minute < 30)
+
     # Attempt 1: yfinance
     try:
         t, hist = _fetch_daily_series(symbol)
         if hist is not None and not hist.empty and "Close" in hist.columns and len(hist) >= 2:
-            prev_close = _safe_float(hist["Close"].iloc[-2])
             last_close = _safe_float(hist["Close"].iloc[-1])
+            prev_close = _safe_float(hist["Close"].iloc[-2])
             last_vol = _safe_int(hist["Volume"].iloc[-1])
 
             price = None
@@ -133,12 +136,21 @@ def fetch_equity_with_fallback(symbol: str) -> dict | None:
             if price is None:
                 price = last_close
 
-            if prev_close is not None and price is not None:
-                pct_change = ((price - prev_close) / prev_close) * 100.0
-                print(f"[market] {symbol}: fetched via yfinance")
+            # Pre-market fix: compare live price vs yesterday's close
+            # During market hours: hist[-1] is today's running close, hist[-2] is yesterday
+            # Pre-market: hist[-1] is yesterday, hist[-2] is day before
+            if is_premarket and last_close is not None:
+                # prev_close should be yesterday's close (most recent bar)
+                ref_price = last_close
+            else:
+                ref_price = prev_close
+
+            if ref_price is not None and price is not None:
+                pct_change = ((price - ref_price) / ref_price) * 100.0
+                print(f"[market] {symbol}: fetched via yfinance {'(pre-market)' if is_premarket else ''}")
                 return {
                     "price": float(price),
-                    "prev_close": float(prev_close),
+                    "prev_close": float(ref_price),
                     "pct_change": float(pct_change),
                     "volume": int(last_vol) if last_vol is not None else 0,
                 }
