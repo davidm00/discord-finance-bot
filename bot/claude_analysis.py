@@ -361,7 +361,7 @@ def generate_analysis(
             )
         sig_lines.append(
             "If re-recommending a ticker, reference your prior call and whether the thesis is playing out. "
-            "If a prior call was wrong, acknowledge it briefly and explain what changed."
+            "You may absolutely re-recommend a ticker even if your prior call was wrong — just acknowledge the miss and explain your updated reasoning."
         )
         sections.append("\n".join(sig_lines))
 

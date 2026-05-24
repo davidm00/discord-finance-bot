@@ -434,8 +434,8 @@ def build_weekly_prompt(
             "Current Price is Friday's close. "
             "ALSO use this performance history when making Tickers to Watch Next Week picks: "
             "if a prior thesis played out, say whether it has further room to run. "
-            "If you were wrong, acknowledge it and recalibrate your conviction. "
-            "Do NOT repeat a failed thesis without new evidence supporting it."
+            "If you were wrong, acknowledge the miss and recalibrate your conviction. "
+            "You may still re-recommend the same ticker — just explain what has changed or why you remain convicted despite the prior miss."
         )
 
     # 3) Headlines
