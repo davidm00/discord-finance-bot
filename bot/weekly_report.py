@@ -273,6 +273,16 @@ def fetch_weekly_market_performance() -> dict[str, dict[str, Any]]:
             low_v = float(lows.min())
             pct = ((close_v - open_v) / open_v) * 100.0 if open_v else None
 
+            # Daily % changes for mini-timeline
+            daily_pcts = []
+            for i in range(len(closes)):
+                if i == 0:
+                    day_pct = ((float(closes.iloc[0]) - open_v) / open_v) * 100.0 if open_v else 0
+                else:
+                    prev = float(closes.iloc[i - 1])
+                    day_pct = ((float(closes.iloc[i]) - prev) / prev) * 100.0 if prev else 0
+                daily_pcts.append(round(day_pct, 2))
+
             start_date = df.index[0]
             if hasattr(start_date, "date"):
                 start_date_s = start_date.date().isoformat()
@@ -286,6 +296,7 @@ def fetch_weekly_market_performance() -> dict[str, dict[str, Any]]:
                 "high": high_v,
                 "low": low_v,
                 "week_start": start_date_s,
+                "daily_pcts": daily_pcts,
             }
         except Exception as exc:
             print(f"[weekly] WARNING: weekly performance fetch failed for {t}: {exc}")
@@ -365,7 +376,7 @@ def build_weekly_prompt(
         lines.append("No notable trades this week.")
 
     lines.append("")
-    lines.append("Major contracts this week (>= $50M, last 30 days, filtered):")
+    lines.append("Major government contracts this week ($10M+, last 7 days, defense/intel/energy/homeland filtered):")
     if contracts:
         for c in contracts[:10]:
             lines.append(
@@ -395,7 +406,8 @@ def build_weekly_prompt(
         "Summarize any notable congressional trades or major government contracts from this week. If correlations exist between the two, call them out plainly. If nothing notable, say so briefly.\n\n"
         "**Bot Scorecard** (only include if previous daily reports are available):\n"
         "For each BUY/SELL/HOLD/WATCH call made in this week's daily reports, score it:\n"
-        "- TICKER — original rating — entry price at time of call — Friday close — result: ✅ played out / ❌ did not play out / ⏳ too early to tell\n"
+        "- TICKER — original rating — specific entry price from the data (e.g., $745.64, not '~$118 area') — Friday close price — result: ✅ played out / ❌ did not play out / ⏳ too early to tell\n"
+        "Use actual prices from the structured data fields, not approximations.\n"
         "Be honest. If the bot was wrong, say so plainly and briefly explain why.\n"
         "If no previous reports available, skip this section entirely.\n\n"
         "**Week Ahead** (bullet points):\n"
@@ -470,8 +482,10 @@ def main() -> int:
         "weekly narrative and explicitly score any ticker calls the bot made — did the "
         "BUY/WATCH/HOLD calls play out? Be honest if they didn't. Always use ET timestamps.\n\n"
         "CRITICAL LENGTH CONSTRAINT: Your ENTIRE response must be under 3800 characters total. "
+        "Budget per section: Week in Review (800 chars), Biggest Story (400 chars), "
+        "Political Trades (400 chars), Bot Scorecard (600 chars), Week Ahead (300 chars), "
+        "Tickers to Watch (500 chars). "
         "This is a quick-read weekly summary — not a deep research report. "
-        "Each section should be 1-2 short paragraphs MAX. "
         "Use **bold** for section headers (not # markdown). Separate sections with ---."
     )
 
@@ -582,6 +596,18 @@ def main() -> int:
         perf_lines.append(
             f"{label}: {_fmt_price(d.get('open'))}→{_fmt_price(d.get('close'))} ({_fmt_pct(d.get('pct_change'))}) | Range: {_fmt_price(d.get('low'))}–{_fmt_price(d.get('high'))}"
         )
+
+    # Add daily arc timeline for SPY (market bellwether)
+    spy_data = weekly_perf.get("SPY") or {}
+    spy_daily = spy_data.get("daily_pcts") or []
+    if spy_daily:
+        day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+        arc_parts = []
+        for i, pct in enumerate(spy_daily[:5]):
+            label = day_labels[i] if i < len(day_labels) else f"D{i+1}"
+            arrow = "▲" if pct >= 0 else "▼"
+            arc_parts.append(f"{label}: {arrow}{abs(pct):.1f}%")
+        perf_lines.append(f"📊 SPY Daily Arc: {' → '.join(arc_parts)}")
 
     trades = (political or {}).get("trades") or []
     contracts = (political or {}).get("contracts") or []

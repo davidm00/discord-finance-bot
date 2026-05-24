@@ -137,6 +137,38 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
         else:
             rating = _normalize_rating(header_str)
 
+            # In the no-pipe case, reason + confidence may be embedded in header_str
+            # Formats:
+            #   "WATCH — reason text. Confidence: MEDIUM"
+            #   "BUY (MEDIUM) — reason text"
+            #   "WATCH (HIGH) — reason text"
+            # Strip the leading rating word(s) to get the rest
+            remainder = header_str
+            # Match: RATING optionally followed by (CONFIDENCE) then separator
+            m_lead = re.match(
+                r"^(BUY|SELL|HOLD|WATCH)\b\s*(?:\((HIGH|MEDIUM|LOW)\))?\s*[—–\-:]*\s*",
+                remainder, re.IGNORECASE
+            )
+            if m_lead:
+                if m_lead.group(2):
+                    confidence = _normalize_confidence(m_lead.group(2))
+                remainder = remainder[m_lead.end():]
+            # Also check for trailing "Confidence: X" pattern
+            m_conf_hdr = re.search(r"\bconfidence\s*[:\-—–]\s*(\w+)", remainder, re.IGNORECASE)
+            if m_conf_hdr:
+                if not confidence:
+                    confidence = _normalize_confidence(m_conf_hdr.group(1))
+                # Reason is everything before the confidence marker
+                reason = remainder[: m_conf_hdr.start()].strip().rstrip(".").strip()
+            else:
+                reason = remainder.strip()
+            # Also check for parenthetical confidence at end: "reason text (Medium)"
+            if not confidence:
+                m_paren_conf = re.search(r"\((HIGH|MEDIUM|LOW)\)\s*$", reason, re.IGNORECASE)
+                if m_paren_conf:
+                    confidence = _normalize_confidence(m_paren_conf.group(1))
+                    reason = reason[: m_paren_conf.start()].strip().rstrip(".").strip()
+
         # Also scan body lines for additional reason text or confidence
         reason_lines = []
         for line in block_lines:
