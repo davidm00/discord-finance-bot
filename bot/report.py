@@ -317,6 +317,13 @@ def main() -> int:
     market_state = get_market_state()
     print(f"[report] Market state: {market_state['state']} — {market_state['label']}")
 
+    # Skip daily reports on holidays/weekends (market closed, data would be stale)
+    if not market_state["is_trading_day"] and not dry_run:
+        holiday_label = market_state.get("holiday_name") or "Weekend"
+        next_open = market_state.get("next_open_et") or "next trading day"
+        print(f"[report] SKIPPING — market is closed ({holiday_label}). Next open: {next_open}")
+        return 0
+
     print(f"[report] Report type: {report_type} ({date_et} ET)")
 
     print("[report] Fetching previous Discord reports...")
