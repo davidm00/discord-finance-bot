@@ -32,7 +32,7 @@ from market_data import fetch_macro_context
 from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
-from signal_logger import log_recommendations
+from signal_logger import log_recommendations, CSV_PATH
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -305,11 +305,79 @@ def fetch_weekly_market_performance() -> dict[str, dict[str, Any]]:
     return out
 
 
+def read_weekly_signals() -> list[dict[str, str]]:
+    """Read signals.csv and return this week's entries with current prices."""
+    import csv
+    from datetime import timedelta
+
+    if not os.path.isfile(CSV_PATH):
+        print("[weekly] No signals.csv found — skipping signal history")
+        return []
+
+    now_et = datetime.now(ET_TZ)
+    # Find most recent Monday
+    days_since_monday = now_et.weekday()
+    monday = (now_et - timedelta(days=days_since_monday)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    monday_str = monday.strftime("%Y-%m-%d")
+
+    signals = []
+    try:
+        with open(CSV_PATH, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("date_et", "") >= monday_str:
+                    signals.append(row)
+    except Exception as exc:
+        print(f"[weekly] WARNING: failed to read signals.csv: {exc}")
+        return []
+
+    if not signals:
+        print("[weekly] No signals found for this week in CSV")
+        return signals
+
+    print(f"[weekly] Read {len(signals)} signals from CSV for week of {monday_str}")
+
+    # Fetch current prices for unique tickers (batch)
+    unique_tickers = list(set(s.get("ticker", "") for s in signals if s.get("ticker")))
+    current_prices: dict[str, float] = {}
+    for ticker in unique_tickers:
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                current_prices[ticker] = round(float(hist["Close"].iloc[-1]), 2)
+        except Exception:
+            pass
+
+    # Enrich signals with current price and P&L
+    for s in signals:
+        ticker = s.get("ticker", "")
+        entry_str = s.get("price_at_signal", "")
+        if ticker in current_prices and entry_str and entry_str != "N/A":
+            try:
+                entry = float(entry_str)
+                current = current_prices[ticker]
+                pnl_pct = ((current - entry) / entry) * 100.0
+                s["current_price"] = f"{current:.2f}"
+                s["pnl_pct"] = f"{pnl_pct:+.2f}%"
+            except (ValueError, ZeroDivisionError):
+                s["current_price"] = "N/A"
+                s["pnl_pct"] = "N/A"
+        else:
+            s["current_price"] = "N/A"
+            s["pnl_pct"] = "N/A"
+
+    return signals
+
+
 def build_weekly_prompt(
     weekly_perf: dict[str, dict[str, Any]],
     weekly_history: list[dict[str, Any]],
     headlines: list[dict[str, Any]],
     political: dict[str, Any],
+    weekly_signals: list[dict[str, str]] | None = None,
 ) -> str:
     lines: list[str] = []
 
@@ -347,6 +415,23 @@ def build_weekly_prompt(
 
         lines.append(
             "Use these reports to: (a) identify the dominant themes of the week, (b) score any BUY/SELL/HOLD/WATCH calls against the weekly close data above, (c) note what the bot got right and wrong."
+        )
+
+    # 2b) Structured signal log (precise entry prices + current prices for scoring)
+    if weekly_signals:
+        lines.append("")
+        lines.append("STRUCTURED SIGNAL LOG (exact entry prices from this week — use these for Bot Scorecard):")
+        lines.append("Date | Time | Ticker | Rating | Confidence | Entry Price | Current Price | P&L")
+        for s in weekly_signals:
+            lines.append(
+                f"{s.get('date_et','')} | {s.get('time_et','')} | {s.get('ticker','')} | "
+                f"{s.get('action','')} | {s.get('confidence','')} | "
+                f"${s.get('price_at_signal','N/A')} | ${s.get('current_price','N/A')} | {s.get('pnl_pct','N/A')}"
+            )
+        lines.append(
+            "Use these EXACT prices in the Bot Scorecard — do not approximate. "
+            "Entry Price is what the ticker was trading at when the call was made. "
+            "Current Price is Friday's close."
         )
 
     # 3) Headlines
@@ -471,6 +556,15 @@ def main() -> int:
         weekly_history = []
     print(f"[weekly] Weekly history: {len(weekly_history)} reports found")
 
+    # Read structured signal log for Bot Scorecard accuracy
+    print("[weekly] Reading signals.csv for this week...")
+    weekly_signals: list[dict[str, str]] = []
+    try:
+        weekly_signals = read_weekly_signals()
+    except Exception as exc:
+        print(f"[weekly] WARNING: signal read failed: {exc}")
+        weekly_signals = []
+
     api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
     system_prompt = (
@@ -490,7 +584,7 @@ def main() -> int:
     )
 
     print("[weekly] Building Claude prompt...")
-    user_prompt = build_weekly_prompt(weekly_perf, weekly_history, headlines, political)
+    user_prompt = build_weekly_prompt(weekly_perf, weekly_history, headlines, political, weekly_signals)
 
     # Append macro context to user prompt if available
     if macro_context:
