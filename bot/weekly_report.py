@@ -146,6 +146,43 @@ def _truncate_preserving_weekly_tickers(text: str, limit: int) -> str:
     return f"{trimmed_prefix}{separator}{ticker_section}".strip()
 
 
+def _compact_scorecard_section(signal_scorecard: str, limit: int = 650) -> str:
+    """Convert the measured scorecard prompt block into a concise visible section."""
+    if not signal_scorecard:
+        return ""
+    keep_prefixes = (
+        "Unique actionable",
+        "Raw actionable",
+        "By action:",
+        "By confidence:",
+        "By catalyst:",
+        "Non-actionable",
+    )
+    lines = ["**Bot Scorecard**"]
+    for raw in signal_scorecard.splitlines():
+        line = raw.strip()
+        if line.startswith(keep_prefixes):
+            lines.append(line)
+    if len(lines) == 1:
+        return ""
+    return _clamp_text("\n".join(lines), limit)
+
+
+def _ensure_scorecard_section(analysis: str, signal_scorecard: str) -> str:
+    """Add a compact measured scorecard when Claude omits the requested section."""
+    if not signal_scorecard or "bot scorecard" in str(analysis or "").lower():
+        return analysis
+
+    section = _compact_scorecard_section(signal_scorecard)
+    if not section:
+        return analysis
+
+    marker = re.search(r"\n---\n\n\*\*Tickers to Watch Next Week\*\*", analysis, re.IGNORECASE)
+    if marker:
+        return analysis[: marker.start()].rstrip() + "\n\n---\n\n" + section + analysis[marker.start():]
+    return analysis.rstrip() + "\n\n---\n\n" + section
+
+
 def _embed_char_count(embed: dict) -> int:
     title = str(embed.get("title") or "")
     desc = str(embed.get("description") or "")
@@ -744,6 +781,8 @@ def main() -> int:
 
             if DISCLAIMER_LINE not in analysis:
                 analysis = analysis.rstrip() + "\n" + DISCLAIMER_LINE
+
+            analysis = _ensure_scorecard_section(analysis, signal_scorecard)
 
             print(f"[weekly] Response received: {len(analysis)} chars")
 

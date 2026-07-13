@@ -1092,6 +1092,15 @@ Confidence: HIGH
         assert "Catalyst Type: geopolitical" in trimmed, "weekly truncation dropped structured catalyst"
         assert "Rating: BUY" in trimmed, "weekly truncation dropped ticker rating"
 
+        inserted = weekly_report._ensure_scorecard_section(
+            "**Week in Review**\nMarkets.\n\n---\n\n**Tickers to Watch Next Week**\n\n**XOM — ExxonMobil**\nRating: BUY",
+            "SIGNAL SCORECARD\n"
+            "Unique actionable BUY/SELL ideas, 5D directional performance: n=2, avg=+1.50%\n"
+            "By catalyst: geopolitical: n=1, avg=+5.00%",
+        )
+        assert "**Bot Scorecard**" in inserted, "weekly scorecard fallback missing"
+        assert inserted.find("**Bot Scorecard**") < inserted.find("**Tickers to Watch Next Week**"), "scorecard should appear before tickers"
+
         runner.record("test_weekly_prompt_scorecard_precedence", True)
     except Exception as e:
         runner.record("test_weekly_prompt_scorecard_precedence", False, str(e))
