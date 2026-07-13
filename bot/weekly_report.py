@@ -46,6 +46,7 @@ DISCORD_DESCRIPTION_MAX = 4096
 DISCORD_FIELD_NAME_MAX = 256
 DISCORD_FIELD_VALUE_MAX = 1024
 DISCORD_FOOTER_TEXT_MAX = 2048
+WEEKLY_DESCRIPTION_TARGET_MAX = 4050
 
 
 def _ensure_utf8_console() -> None:
@@ -754,10 +755,13 @@ def main() -> int:
                 print(f"[weekly] WARNING: parser failed: {exc}")
                 recs = []
 
-            # Pre-flight: ensure analysis fits embed description (max 4096, target 3800)
-            if len(analysis) > 3800:
-                print(f"[weekly] WARNING: Analysis exceeds 3800 chars, truncating while preserving ticker section")
-                analysis = _truncate_preserving_weekly_tickers(analysis, 3800)
+            # Pre-flight: keep under Discord's 4096-char description cap while preserving tickers.
+            if len(analysis) > WEEKLY_DESCRIPTION_TARGET_MAX:
+                print(
+                    f"[weekly] WARNING: Analysis exceeds {WEEKLY_DESCRIPTION_TARGET_MAX} chars, "
+                    "truncating while preserving ticker section"
+                )
+                analysis = _truncate_preserving_weekly_tickers(analysis, WEEKLY_DESCRIPTION_TARGET_MAX)
         except Exception as exc:
             print(f"[weekly] WARNING: Claude call failed: {exc}")
             analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
