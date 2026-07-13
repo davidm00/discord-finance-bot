@@ -1,0 +1,79 @@
+name: Seed Signals Cache
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip --disable-pip-version-check
+          pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Decode corrected signals CSV
+        shell: bash
+        env:
+          SIGNALS_CSV_GZ_B64: ${{ secrets.SIGNALS_CSV_GZ_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNALS_CSV_GZ_B64}" ]; then
+            echo "SIGNALS_CSV_GZ_B64 secret is required" >&2
+            exit 1
+          fi
+          mkdir -p data
+          printf '%s' "${SIGNALS_CSV_GZ_B64}" | base64 -d | gunzip > data/signals.csv
+          python - <<'PY'
+          import csv
+          from pathlib import Path
+
+          path = Path("data/signals.csv")
+          with path.open(newline="", encoding="utf-8-sig") as f:
+              rows = list(csv.DictReader(f))
+          valid = {"BUY", "SELL", "HOLD", "WATCH"}
+          invalid = [
+              (i + 2, r.get("ticker", ""), r.get("action", ""))
+              for i, r in enumerate(rows)
+              if (r.get("action") or "").strip().upper() not in valid
+          ]
+          if invalid:
+              raise SystemExit(f"Invalid actions remain: {invalid[:10]}")
+          print(f"Validated corrected signals.csv rows: {len(rows)}")
+          PY
+
+      - name: Generate signal outcomes
+        shell: bash
+        run: python bot/signal_outcomes.py
+
+      - name: Save corrected signal data cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
+          key: signals-csv-manual-seed-${{ github.run_id }}
+
+      - name: Upload corrected signal data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrected-signal-data-${{ github.run_number }}
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
+          retention-days: 90
+          if-no-files-found: error

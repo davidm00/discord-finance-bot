@@ -42,6 +42,16 @@ def _normalize_confidence(raw: str) -> str:
     return normalized
 
 
+def _extract_rating(raw: str) -> str:
+    rating = _normalize_rating(raw)
+    return rating if rating in RATINGS else ""
+
+
+def _extract_confidence(raw: str) -> str:
+    confidence = _normalize_confidence(raw)
+    return confidence if confidence in CONFIDENCE else ""
+
+
 def _detect_format(block_lines: list[str]) -> str:
     """Return 'daily' if block contains 'Rating:' label, else 'weekly'."""
     for line in block_lines:
@@ -89,13 +99,13 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             m_rating = re.search(r"\brating\s*[:\-—–]\s*([^\n]+)", stripped, re.IGNORECASE)
             if m_rating:
                 in_reason = False
-                rating = _normalize_rating(m_rating.group(1).strip().replace("*", ""))
+                rating = _extract_rating(m_rating.group(1).strip().replace("*", ""))
                 continue
 
             m_conf = re.search(r"\bconfidence\s*[:\-—–]\s*([^\n]+)", stripped, re.IGNORECASE)
             if m_conf:
                 in_reason = False
-                confidence = _normalize_confidence(m_conf.group(1).strip().replace("*", ""))
+                confidence = _extract_confidence(m_conf.group(1).strip().replace("*", ""))
                 continue
 
             low = stripped.lower()
@@ -120,7 +130,7 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             parts = [p.strip().replace("**", "").replace("*", "").strip() for p in header_str.split("|")]
 
             # First part is always the rating
-            rating = _normalize_rating(parts[0])
+            rating = _extract_rating(parts[0])
 
             # Scan remaining parts for confidence; everything else is reason
             reason_parts = []
@@ -128,14 +138,15 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
                 if "confidence" in p.lower():
                     m_conf = re.search(r"\bconfidence\s*[:\-—–]\s*(.+)", p, re.IGNORECASE)
                     if m_conf:
-                        confidence = _normalize_confidence(m_conf.group(1).strip())
+                        confidence = _extract_confidence(m_conf.group(1).strip())
                 else:
                     if p:
                         reason_parts.append(p)
 
             reason = " ".join(reason_parts).strip()
         else:
-            rating = _normalize_rating(header_str)
+            rating = _extract_rating(header_str)
+            header_has_rating = bool(rating)
 
             # In the no-pipe case, reason + confidence may be embedded in header_str
             # Formats:
@@ -150,23 +161,28 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
                 remainder, re.IGNORECASE
             )
             if m_lead:
+                if not rating:
+                    rating = _extract_rating(m_lead.group(1))
                 if m_lead.group(2):
-                    confidence = _normalize_confidence(m_lead.group(2))
+                    confidence = _extract_confidence(m_lead.group(2))
                 remainder = remainder[m_lead.end():]
             # Also check for trailing "Confidence: X" pattern
             m_conf_hdr = re.search(r"\bconfidence\s*[:\-—–]\s*(\w+)", remainder, re.IGNORECASE)
             if m_conf_hdr:
                 if not confidence:
-                    confidence = _normalize_confidence(m_conf_hdr.group(1))
+                    confidence = _extract_confidence(m_conf_hdr.group(1))
                 # Reason is everything before the confidence marker
                 reason = remainder[: m_conf_hdr.start()].strip().rstrip(".").strip()
             else:
                 reason = remainder.strip()
+            if not header_has_rating and not m_lead:
+                # Header text like "**GD — General Dynamics**" names the company, not a reason.
+                reason = ""
             # Also check for parenthetical confidence at end: "reason text (Medium)"
             if not confidence:
                 m_paren_conf = re.search(r"\((HIGH|MEDIUM|LOW)\)\s*$", reason, re.IGNORECASE)
                 if m_paren_conf:
-                    confidence = _normalize_confidence(m_paren_conf.group(1))
+                    confidence = _extract_confidence(m_paren_conf.group(1))
                     reason = reason[: m_paren_conf.start()].strip().rstrip(".").strip()
 
         # Also scan body lines for additional reason text or confidence
@@ -178,11 +194,15 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             m_conf = re.search(r"\bconfidence\s*[:\-—–]\s*([^\n]+)", stripped, re.IGNORECASE)
             if m_conf:
                 if not confidence:
-                    confidence = _normalize_confidence(m_conf.group(1).strip().replace("*", ""))
+                    confidence = _extract_confidence(m_conf.group(1).strip().replace("*", ""))
                 continue
             # Skip lines that are just the rating word or separators
             cleaned = stripped.replace("*", "").replace("-", "").strip()
-            if cleaned.upper() in RATINGS or not cleaned:
+            if cleaned.upper() in RATINGS:
+                if not rating:
+                    rating = cleaned.upper()
+                continue
+            if not cleaned:
                 continue
             reason_lines.append(stripped)
 
@@ -199,13 +219,17 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
 
     print(f"[parser] Raw reason text: {reason[:100]}")
 
-    if ticker and rating and confidence:
+    if ticker and rating in RATINGS and confidence in CONFIDENCE:
         print(f"[parser] Successfully parsed: {ticker} — {rating} ({confidence})")
         rec = {"ticker": ticker, "rating": rating, "reason": reason, "confidence": confidence}
         # Add bull/bear if present (backwards compatible)
         rec["bull_case"] = bull_case if bull_case else None
         rec["bear_case"] = bear_case if bear_case else None
         return rec
+    print(
+        f"[parser] Skipping invalid recommendation: ticker={ticker!r}, "
+        f"rating={rating!r}, confidence={confidence!r}"
+    )
     return None
 
 

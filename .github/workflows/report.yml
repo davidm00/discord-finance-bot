@@ -101,11 +101,13 @@ jobs:
           pip install --disable-pip-version-check -r requirements.txt
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
-      - name: Restore signals.csv cache
+      - name: Restore signal data cache
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache@v4
         with:
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -130,19 +132,23 @@ jobs:
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
 
-      - name: Save signals.csv cache
+      - name: Save signal data cache
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache/save@v4
         with:
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           key: signals-csv-${{ github.run_id }}
 
-      - name: Upload signals CSV as artifact
+      - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4
         if: always() && steps.guard.outputs.should_run == 'true'
         with:
           name: signals-csv-${{ github.run_number }}
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           retention-days: 90
           if-no-files-found: warn
 
@@ -201,11 +207,13 @@ jobs:
           pip install --disable-pip-version-check -r requirements.txt
           echo "[DONE]  Installing dependencies: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S ET')"
 
-      - name: Restore signals.csv cache
+      - name: Restore signal data cache
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache@v4
         with:
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -230,18 +238,22 @@ jobs:
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
 
-      - name: Save signals.csv cache
+      - name: Save signal data cache
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache/save@v4
         with:
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           key: signals-csv-${{ github.run_id }}
 
-      - name: Upload signals CSV as artifact
+      - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4
         if: always() && steps.guard.outputs.should_run == 'true'
         with:
           name: signals-csv-weekly-${{ github.run_number }}
-          path: data/signals.csv
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
           retention-days: 90
           if-no-files-found: warn

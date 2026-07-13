@@ -33,6 +33,7 @@ from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
 from signal_logger import log_recommendations, CSV_PATH
+from signal_outcomes import update_signal_outcomes
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -510,7 +511,18 @@ def build_weekly_prompt(
         "- List 3-5 specific things to watch next week: upcoming earnings, Fed events, macro data releases, or unresolved themes from this week\n"
         "- Keep each point to one plain-English sentence\n\n"
         "**Tickers to Watch Next Week**:\n"
-        "Same format as daily report — 3-5 tickers with BUY/SELL/HOLD/WATCH rating, one-sentence reason, and confidence level. Based on weekly data and themes, not just today's snapshot.\n"
+        "Use exactly 3-5 tickers, based on weekly data and themes, not just today's snapshot. "
+        "Reserve BUY/SELL for clear near-term directional calls with a catalyst, confirming data point, and identifiable risk. "
+        "Use WATCH when the setup is interesting but not actionable yet. Use HOLD when the best decision is explicitly to wait or maintain a prior view. "
+        "Do not force BUY calls.\n\n"
+        "Format each ticker exactly like this:\n"
+        "**TICKER — Company Name**\n"
+        "Bull: [one sentence]\n"
+        "Bear: [one sentence]\n"
+        "Rating: BUY/SELL/HOLD/WATCH\n"
+        "Reason: [one sentence citing specific data + intended horizon]\n"
+        "Confidence: HIGH/MEDIUM/LOW\n\n"
+        "Do not put the company name on the Rating line. Do not put a rating on the Confidence line.\n"
         f"End with the standard disclaimer on its own line:\n{DISCLAIMER_LINE}"
     )
 
@@ -678,9 +690,15 @@ def main() -> int:
         print("[weekly] No recommendations parsed from analysis.")
 
     # Signal logging
-    if recs:
+    if recs and dry_run:
+        print(f"[weekly] DRY_RUN=1 set — skipping signal logging for {len(recs)} parsed signals")
+    elif recs:
         log_recommendations(recs, "weekly")
         print(f"[weekly] Signal logging complete: {len(recs)} signals logged")
+        try:
+            update_signal_outcomes()
+        except Exception as exc:
+            print(f"[weekly] WARNING: outcome update failed: {exc}")
 
     # Monday date for title/footer
     monday_date = ""

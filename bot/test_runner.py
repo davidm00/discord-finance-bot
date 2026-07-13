@@ -287,6 +287,47 @@ def run_mock_tests() -> int:
             assert data_row[confidence_idx] == "HIGH", f"confidence mismatch: {data_row[confidence_idx]}"
             assert data_row[price_idx] == "100.00", f"price mismatch: {data_row[price_idx]}"
 
+            signal_logger.log_signal("BAD", "GENERAL DYNAMICS", "MEDIUM", 100.00, "weekly", "bad parser row")
+            with open(test_csv, "r", encoding="utf-8") as f:
+                rows_after_invalid = list(csv.reader(f))
+            assert len(rows_after_invalid) == len(rows), "invalid action should not be appended"
+
+            captured_symbols = []
+            original_ticker = signal_logger.yf.Ticker
+
+            class FakeClose:
+                @property
+                def iloc(self):
+                    return self
+
+                def __getitem__(self, idx):
+                    assert idx == -1
+                    return 1805.25
+
+            class FakeHistory:
+                empty = False
+
+                def __getitem__(self, key):
+                    assert key == "Close"
+                    return FakeClose()
+
+            class FakeTicker:
+                def __init__(self, symbol):
+                    captured_symbols.append(symbol)
+
+                def history(self, period):
+                    assert period == "2d"
+                    return FakeHistory()
+
+            signal_logger.yf.Ticker = FakeTicker
+            try:
+                eth_price = signal_logger.fetch_price_for_ticker("ETH")
+            finally:
+                signal_logger.yf.Ticker = original_ticker
+
+            assert captured_symbols == ["ETH-USD"], f"expected ETH-USD mapping, got {captured_symbols}"
+            assert eth_price == 1805.25, f"expected mapped ETH price, got {eth_price}"
+
             runner.record("test_signal_logging", True)
         finally:
             signal_logger.CSV_PATH = original_path
@@ -338,6 +379,27 @@ Confidence: Medium-High
         assert results[0]["rating"] == "WATCH", f"weekly: expected WATCH, got {results[0]['rating']}"
         assert results[1]["confidence"] == "HIGH", f"weekly: Medium-High should normalize to HIGH, got {results[1]['confidence']}"
         assert len(results[0]["reason"]) > 10, "weekly: reason too short"
+
+        # Regression: do not treat company names as ratings/actions.
+        malformed_weekly_response = """
+**Tickers to Watch Next Week**
+
+**GD — General Dynamics**
+WATCH
+Defense contract momentum is real, but wait for confirmation.
+Confidence: Medium
+
+**XOM — ExxonMobil**
+Rating: SELL
+Reason: Crude risk premium is fading into the 5-day horizon.
+Confidence: HIGH
+"""
+        results = recommendation_parser.parse_recommendations(malformed_weekly_response)
+        assert len(results) == 2, f"malformed weekly: expected 2 recs, got {len(results)}"
+        assert results[0]["ticker"] == "GD", f"malformed weekly: expected GD, got {results[0]['ticker']}"
+        assert results[0]["rating"] == "WATCH", f"malformed weekly: expected WATCH, got {results[0]['rating']}"
+        assert not results[0]["reason"].startswith("General Dynamics"), f"company name leaked into reason: {results[0]['reason']}"
+        assert results[1]["rating"] == "SELL", f"malformed weekly: expected SELL, got {results[1]['rating']}"
 
         runner.record("test_recommendation_parser", True)
     except Exception as e:
@@ -633,6 +695,96 @@ Confidence: HIGH
                 os.remove(test_csv)
     except Exception as e:
         runner.record("test_e2e_mock_pipeline", False, str(e))
+
+    # test_signal_outcome_tracking
+    try:
+        import signal_outcomes
+
+        test_signals = os.path.join(tempfile.gettempdir(), "test_signal_outcomes_signals.csv")
+        test_outcomes = os.path.join(tempfile.gettempdir(), "test_signal_outcomes.csv")
+        for p in (test_signals, test_outcomes):
+            if os.path.exists(p):
+                os.remove(p)
+
+        with open(test_signals, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "date_et", "time_et", "ticker", "action", "confidence",
+                "price_at_signal", "report_type", "reasoning_summary",
+            ])
+            writer.writeheader()
+            writer.writerow({
+                "date_et": "2026-01-02",
+                "time_et": "08:01",
+                "ticker": "XOM",
+                "action": "BUY",
+                "confidence": "HIGH",
+                "price_at_signal": "100.00",
+                "report_type": "pre-market",
+                "reasoning_summary": "test buy",
+            })
+            writer.writerow({
+                "date_et": "2026-01-02",
+                "time_et": "16:15",
+                "ticker": "XOM",
+                "action": "SELL",
+                "confidence": "MEDIUM",
+                "price_at_signal": "100.00",
+                "report_type": "post-market",
+                "reasoning_summary": "test sell",
+            })
+            writer.writerow({
+                "date_et": "2026-01-02",
+                "time_et": "08:01",
+                "ticker": "BAD",
+                "action": "GENERAL DYNAMICS",
+                "confidence": "MEDIUM",
+                "price_at_signal": "100.00",
+                "report_type": "weekly",
+                "reasoning_summary": "bad row",
+            })
+
+        original_history_points = signal_outcomes._history_points
+        fake_points = [
+            (datetime(2026, 1, 2).date(), 100.0),
+            (datetime(2026, 1, 3).date(), 101.0),
+            (datetime(2026, 1, 4).date(), 102.0),
+            (datetime(2026, 1, 5).date(), 103.0),
+            (datetime(2026, 1, 6).date(), 104.0),
+            (datetime(2026, 1, 7).date(), 105.0),
+            (datetime(2026, 1, 8).date(), 106.0),
+            (datetime(2026, 1, 9).date(), 107.0),
+            (datetime(2026, 1, 10).date(), 108.0),
+            (datetime(2026, 1, 11).date(), 109.0),
+            (datetime(2026, 1, 12).date(), 110.0),
+        ]
+        signal_outcomes._history_points = lambda ticker, period="6mo": fake_points
+
+        try:
+            count = signal_outcomes.update_signal_outcomes(test_signals, test_outcomes)
+        finally:
+            signal_outcomes._history_points = original_history_points
+
+        assert count == 2, f"expected 2 outcome rows, got {count}"
+        with open(test_outcomes, "r", newline="", encoding="utf-8") as f:
+            outcome_rows = list(csv.DictReader(f))
+
+        assert len(outcome_rows) == 2, f"expected 2 written rows, got {len(outcome_rows)}"
+        buy = outcome_rows[0]
+        sell = outcome_rows[1]
+        assert buy["ticker"] == "XOM" and buy["action"] == "BUY", f"bad buy row: {buy}"
+        assert buy["return_5d_pct"] == "4.00", f"expected BUY 5d raw return 4.00, got {buy['return_5d_pct']}"
+        assert buy["signal_return_5d_pct"] == "4.00", f"expected BUY signal return 4.00, got {buy['signal_return_5d_pct']}"
+        assert sell["action"] == "SELL", f"bad sell row: {sell}"
+        assert sell["return_5d_pct"] == "5.00", f"expected SELL raw return 5.00, got {sell['return_5d_pct']}"
+        assert sell["signal_return_5d_pct"] == "-5.00", f"expected SELL directional return -5.00, got {sell['signal_return_5d_pct']}"
+
+        for p in (test_signals, test_outcomes):
+            if os.path.exists(p):
+                os.remove(p)
+
+        runner.record("test_signal_outcome_tracking", True)
+    except Exception as e:
+        runner.record("test_signal_outcome_tracking", False, str(e))
 
     return runner.summary()
 

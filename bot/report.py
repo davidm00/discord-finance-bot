@@ -30,6 +30,7 @@ from news_fetcher import fetch_top_headlines
 from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
 from signal_logger import log_recommendations, CSV_PATH
+from signal_outcomes import update_signal_outcomes
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -483,9 +484,15 @@ def main() -> int:
     print(f"[report] Recommendations parsed: {len(recs)}")
 
     # Signal logging
-    if recs:
+    if recs and dry_run:
+        print(f"[report] DRY_RUN=1 set — skipping signal logging for {len(recs)} parsed signals")
+    elif recs:
         log_recommendations(recs, report_type)
         print(f"[report] Signal logging complete: {len(recs)} signals logged")
+        try:
+            update_signal_outcomes()
+        except Exception as exc:
+            print(f"[report] WARNING: outcome update failed: {exc}")
 
     equities = market_data.get("equities", {})
 
