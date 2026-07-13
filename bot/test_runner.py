@@ -953,6 +953,9 @@ Confidence: HIGH
         assert "SIGNAL SCORECARD TEST BLOCK" in prompt, "scorecard missing from daily prompt"
         assert "RECENT SIGNALS" not in prompt, "raw recent signals should be omitted when scorecard exists"
         assert "RAW | BUY" not in prompt, "raw signal row leaked into scorecard prompt"
+        assert "avoid defaulting to WATCH" in prompt, "daily prompt missing anti-WATCH-bias calibration"
+        assert "do not hide actionable conviction behind WATCH" in prompt, "daily prompt should convert actionable setups to BUY/SELL"
+        assert "Do not force BUY calls" not in prompt, "daily prompt still contains old caution-bias wording"
 
         runner.record("test_scorecard_prompt_precedence", True)
     except Exception as e:
@@ -983,6 +986,9 @@ Confidence: HIGH
         assert "WEEKLY SCORECARD TEST BLOCK" in prompt, "scorecard missing from weekly prompt"
         assert "STRUCTURED SIGNAL LOG" not in prompt, "raw signal log should be omitted when weekly scorecard exists"
         assert "RAW | BUY" not in prompt, "raw weekly signal row leaked into scorecard prompt"
+        assert "Avoid defaulting to WATCH" in prompt, "weekly prompt missing anti-WATCH-bias calibration"
+        assert "do not hide actionable conviction behind WATCH" in prompt, "weekly prompt should convert actionable setups to BUY/SELL"
+        assert "Do not force BUY calls" not in prompt, "weekly prompt still contains old caution-bias wording"
 
         fallback_prompt = weekly_report.build_weekly_prompt(
             weekly_perf=MOCK_MARKET_DATA["equities"],

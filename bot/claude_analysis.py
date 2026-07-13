@@ -281,9 +281,11 @@ def generate_analysis(
 
     ticker_instruction = (
         "Finally, add a 'Tickers to Watch' section with exactly 3-5 tickers (prefer 3 unless there are truly strong signals for more).\n\n"
-        "Quality bar from prior signal tracking: reserve BUY/SELL for clear near-term directional calls with a catalyst, a confirming data point, and an identifiable risk. "
-        "Use WATCH when the setup is interesting but not actionable yet. Use HOLD when the best decision is explicitly to wait or maintain a prior view. "
-        "Do not force BUY calls; weak BUY calls have been less reliable than cautious WATCH/HOLD or well-supported SELL calls.\n\n"
+        "Action calibration from prior signal tracking: avoid defaulting to WATCH just because markets are noisy. "
+        "Use BUY or SELL when the bull/bear balance clearly points to a near-term directional trade with a catalyst, a confirming data point, an identifiable risk, and a 1-day/5-day/next-catalyst horizon. "
+        "Use WATCH only when the setup is interesting but a required trigger is still missing; name the missing trigger in the Reason. "
+        "Use HOLD only when the best decision is explicitly to wait or maintain a prior view. "
+        "Do not force weak BUY/SELL calls, but do not hide actionable conviction behind WATCH.\n\n"
         "For each ticker, structure your analysis in three steps before giving a rating:\n\n"
         "BULL CASE: In one sentence, what is the strongest argument FOR this ticker right now based on today's data?\n\n"
         "BEAR CASE: In one sentence, what is the strongest argument AGAINST this ticker right now based on today's data?\n\n"

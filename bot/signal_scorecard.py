@@ -206,6 +206,6 @@ def build_signal_scorecard(
 
     lines.append(
         "Use this scorecard to calibrate conviction: repeat what is working, acknowledge misses, "
-        "and avoid forcing BUY/SELL calls when evidence is weak."
+        "avoid forcing BUY/SELL calls when evidence is weak, and avoid hiding actionable conviction behind WATCH."
     )
     return "\n".join(lines)
