@@ -34,6 +34,7 @@ from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
 from signal_logger import log_recommendations, CSV_PATH
 from signal_outcomes import update_signal_outcomes
+from signal_scorecard import build_signal_scorecard
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -386,6 +387,7 @@ def build_weekly_prompt(
     headlines: list[dict[str, Any]],
     political: dict[str, Any],
     weekly_signals: list[dict[str, str]] | None = None,
+    signal_scorecard: str | None = None,
 ) -> str:
     lines: list[str] = []
 
@@ -425,10 +427,18 @@ def build_weekly_prompt(
             "Use these reports to: (a) identify the dominant themes of the week, (b) score any BUY/SELL/HOLD/WATCH calls against the weekly close data above, (c) note what the bot got right and wrong."
         )
 
-    # 2b) Structured signal log (precise entry prices + current prices for scoring)
-    if weekly_signals:
+    # 2b) Compact measured scorecard, preferred over raw signal rows.
+    if signal_scorecard:
         lines.append("")
-        lines.append("STRUCTURED SIGNAL LOG (exact entry prices from this week — use these for Bot Scorecard):")
+        lines.append(signal_scorecard.strip())
+        lines.append(
+            "Use this measured scorecard for the Bot Scorecard and next-week calibration. "
+            "Do not approximate or invent results not shown here."
+        )
+    # Fallback only: raw signal log when signal_outcomes.csv is not available yet.
+    elif weekly_signals:
+        lines.append("")
+        lines.append("STRUCTURED SIGNAL LOG (outcome scorecard unavailable; use cautiously for Bot Scorecard):")
         lines.append("Date | Time | Ticker | Rating | Confidence | Entry Price | Current Price | P&L")
         for s in weekly_signals:
             lines.append(
@@ -588,6 +598,10 @@ def main() -> int:
         print(f"[weekly] WARNING: signal read failed: {exc}")
         weekly_signals = []
 
+    signal_scorecard = build_signal_scorecard(days=14)
+    if signal_scorecard:
+        print("[weekly] Signal scorecard loaded for prompt calibration")
+
     api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
     system_prompt = (
@@ -607,7 +621,14 @@ def main() -> int:
     )
 
     print("[weekly] Building Claude prompt...")
-    user_prompt = build_weekly_prompt(weekly_perf, weekly_history, headlines, political, weekly_signals)
+    user_prompt = build_weekly_prompt(
+        weekly_perf,
+        weekly_history,
+        headlines,
+        political,
+        weekly_signals,
+        signal_scorecard=signal_scorecard,
+    )
 
     # Append macro context to user prompt if available
     if macro_context:

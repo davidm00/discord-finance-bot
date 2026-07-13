@@ -29,6 +29,7 @@ def generate_analysis(
     report_type: str,
     macro_context: dict[str, Any] | None = None,
     recent_signals: list[dict[str, str]] | None = None,
+    signal_scorecard: str | None = None,
 ) -> str:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -352,10 +353,13 @@ def generate_analysis(
     if prev_block:
         sections.append(prev_block)
 
-    # Recent signal performance — helps Claude calibrate future picks
-    if recent_signals:
+    # Outcome scorecard — compact feedback loop for calibrating future picks.
+    if signal_scorecard:
+        sections.append(signal_scorecard.strip())
+    # Raw recent signals are a fallback when the outcome tracker has no data yet.
+    elif recent_signals:
         sig_lines = [
-            "YOUR RECENT SIGNAL PERFORMANCE (use this to calibrate today's picks):",
+            "RECENT SIGNALS (outcome scorecard unavailable; use cautiously to calibrate today's picks):",
             "Date | Ticker | Rating | Entry Price | Current Price | P&L",
         ]
         for s in recent_signals:

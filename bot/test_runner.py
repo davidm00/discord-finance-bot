@@ -786,6 +786,67 @@ Confidence: HIGH
     except Exception as e:
         runner.record("test_signal_outcome_tracking", False, str(e))
 
+    # test_signal_scorecard_prompt_summary
+    try:
+        import signal_scorecard
+
+        test_outcomes = os.path.join(tempfile.gettempdir(), "test_signal_scorecard.csv")
+        today = datetime.now(ET_TZ).strftime("%Y-%m-%d")
+        with open(test_outcomes, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "signal_id", "date_et", "time_et", "ticker", "action", "confidence",
+                "price_at_signal", "report_type", "expected_direction", "actionable",
+                "price_1d", "return_1d_pct", "signal_return_1d_pct",
+                "price_5d", "return_5d_pct", "signal_return_5d_pct",
+                "price_10d", "return_10d_pct", "signal_return_10d_pct",
+                "spy_return_5d_pct", "qqq_return_5d_pct", "status", "updated_at_et",
+            ])
+            writer.writeheader()
+            writer.writerow({
+                "signal_id": "a", "date_et": today, "time_et": "08:01", "ticker": "XOM",
+                "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
+                "report_type": "pre-market", "expected_direction": "short", "actionable": "true",
+                "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
+                "price_5d": "95.00", "return_5d_pct": "-5.00", "signal_return_5d_pct": "5.00",
+                "price_10d": "94.00", "return_10d_pct": "-6.00", "signal_return_10d_pct": "6.00",
+                "spy_return_5d_pct": "1.00", "qqq_return_5d_pct": "2.00", "status": "complete",
+                "updated_at_et": today,
+            })
+            writer.writerow({
+                "signal_id": "b", "date_et": today, "time_et": "16:15", "ticker": "LMT",
+                "action": "BUY", "confidence": "MEDIUM", "price_at_signal": "100.00",
+                "report_type": "post-market", "expected_direction": "long", "actionable": "true",
+                "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "1.00",
+                "price_5d": "98.00", "return_5d_pct": "-2.00", "signal_return_5d_pct": "-2.00",
+                "price_10d": "", "return_10d_pct": "", "signal_return_10d_pct": "",
+                "spy_return_5d_pct": "1.00", "qqq_return_5d_pct": "2.00", "status": "partial",
+                "updated_at_et": today,
+            })
+            writer.writerow({
+                "signal_id": "c", "date_et": today, "time_et": "08:01", "ticker": "RTX",
+                "action": "WATCH", "confidence": "MEDIUM", "price_at_signal": "100.00",
+                "report_type": "pre-market", "expected_direction": "neutral", "actionable": "false",
+                "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "",
+                "price_5d": "102.00", "return_5d_pct": "2.00", "signal_return_5d_pct": "",
+                "price_10d": "103.00", "return_10d_pct": "3.00", "signal_return_10d_pct": "",
+                "spy_return_5d_pct": "1.00", "qqq_return_5d_pct": "2.00", "status": "complete",
+                "updated_at_et": today,
+            })
+
+        scorecard = signal_scorecard.build_signal_scorecard(days=14, outcomes_path=test_outcomes)
+        assert "SIGNAL SCORECARD" in scorecard, "missing scorecard header"
+        assert "Actionable BUY/SELL 5D directional performance: n=2" in scorecard, scorecard
+        assert "avg=+1.50%" in scorecard, scorecard
+        assert "WATCH=1" in scorecard, scorecard
+        assert "Recent measured BUY/SELL calls" in scorecard, scorecard
+
+        if os.path.exists(test_outcomes):
+            os.remove(test_outcomes)
+
+        runner.record("test_signal_scorecard_prompt_summary", True)
+    except Exception as e:
+        runner.record("test_signal_scorecard_prompt_summary", False, str(e))
+
     return runner.summary()
 
 

@@ -31,6 +31,7 @@ from political_data import fetch_political_data
 from recommendation_parser import parse_recommendations
 from signal_logger import log_recommendations, CSV_PATH
 from signal_outcomes import update_signal_outcomes
+from signal_scorecard import build_signal_scorecard
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -457,6 +458,9 @@ def main() -> int:
 
     # Read recent signal performance for feedback loop
     recent_signals = _read_recent_signals(days=5)
+    signal_scorecard = build_signal_scorecard(days=14)
+    if signal_scorecard:
+        print("[report] Signal scorecard loaded for prompt calibration")
 
     analysis = generate_analysis(
         market_data=market_data,
@@ -468,6 +472,7 @@ def main() -> int:
         report_type=report_type,
         macro_context=macro_context,
         recent_signals=recent_signals,
+        signal_scorecard=signal_scorecard,
     )
 
     analysis = _enforce_disclaimer(analysis)
