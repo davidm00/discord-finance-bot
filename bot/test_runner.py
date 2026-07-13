@@ -899,6 +899,198 @@ Confidence: HIGH
     except Exception as e:
         runner.record("test_signal_scorecard_prompt_summary", False, str(e))
 
+    # test_scorecard_prompt_precedence
+    try:
+        import claude_analysis
+
+        captured: dict[str, str] = {}
+        original_anthropic = claude_analysis.Anthropic
+        original_api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+        class FakeMsg:
+            usage = None
+            content = [type("Part", (), {"text": MOCK_CLAUDE_RESPONSE})()]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                captured["user_prompt"] = kwargs["messages"][0]["content"]
+                return FakeMsg()
+
+        class FakeAnthropic:
+            def __init__(self, api_key):
+                self.messages = FakeMessages()
+
+        claude_analysis.Anthropic = FakeAnthropic
+        os.environ["ANTHROPIC_API_KEY"] = "test-key"
+        try:
+            claude_analysis.generate_analysis(
+                market_data=MOCK_MARKET_DATA,
+                crypto_data=MOCK_CRYPTO_DATA,
+                news_items=MOCK_NEWS_ITEMS,
+                political_data=MOCK_POLITICAL_DATA,
+                previous_reports=[],
+                earnings=MOCK_EARNINGS,
+                report_type="pre-market",
+                macro_context=MOCK_MACRO_CONTEXT,
+                recent_signals=[{
+                    "date_et": "2026-01-01",
+                    "ticker": "RAW",
+                    "action": "BUY",
+                    "price_at_signal": "100",
+                    "current_price": "101",
+                    "pnl_pct": "+1.00%",
+                }],
+                signal_scorecard="SIGNAL SCORECARD TEST BLOCK",
+            )
+        finally:
+            claude_analysis.Anthropic = original_anthropic
+            if original_api_key is None:
+                os.environ.pop("ANTHROPIC_API_KEY", None)
+            else:
+                os.environ["ANTHROPIC_API_KEY"] = original_api_key
+
+        prompt = captured.get("user_prompt", "")
+        assert "SIGNAL SCORECARD TEST BLOCK" in prompt, "scorecard missing from daily prompt"
+        assert "RECENT SIGNALS" not in prompt, "raw recent signals should be omitted when scorecard exists"
+        assert "RAW | BUY" not in prompt, "raw signal row leaked into scorecard prompt"
+
+        runner.record("test_scorecard_prompt_precedence", True)
+    except Exception as e:
+        runner.record("test_scorecard_prompt_precedence", False, str(e))
+
+    # test_weekly_prompt_scorecard_precedence
+    try:
+        import weekly_report
+
+        prompt = weekly_report.build_weekly_prompt(
+            weekly_perf=MOCK_MARKET_DATA["equities"],
+            weekly_history=[],
+            headlines=MOCK_NEWS_ITEMS,
+            political=MOCK_POLITICAL_DATA,
+            weekly_signals=[{
+                "date_et": "2026-01-01",
+                "time_et": "08:01",
+                "ticker": "RAW",
+                "action": "BUY",
+                "confidence": "HIGH",
+                "price_at_signal": "100",
+                "current_price": "101",
+                "pnl_pct": "+1.00%",
+            }],
+            signal_scorecard="WEEKLY SCORECARD TEST BLOCK",
+        )
+
+        assert "WEEKLY SCORECARD TEST BLOCK" in prompt, "scorecard missing from weekly prompt"
+        assert "STRUCTURED SIGNAL LOG" not in prompt, "raw signal log should be omitted when weekly scorecard exists"
+        assert "RAW | BUY" not in prompt, "raw weekly signal row leaked into scorecard prompt"
+
+        fallback_prompt = weekly_report.build_weekly_prompt(
+            weekly_perf=MOCK_MARKET_DATA["equities"],
+            weekly_history=[],
+            headlines=[],
+            political={},
+            weekly_signals=[{
+                "date_et": "2026-01-01",
+                "time_et": "08:01",
+                "ticker": "RAW",
+                "action": "BUY",
+                "confidence": "HIGH",
+                "price_at_signal": "100",
+                "current_price": "101",
+                "pnl_pct": "+1.00%",
+            }],
+            signal_scorecard="",
+        )
+        assert "STRUCTURED SIGNAL LOG" in fallback_prompt, "raw fallback should appear when scorecard is unavailable"
+        assert "RAW | BUY" in fallback_prompt, "raw fallback signal row missing"
+
+        runner.record("test_weekly_prompt_scorecard_precedence", True)
+    except Exception as e:
+        runner.record("test_weekly_prompt_scorecard_precedence", False, str(e))
+
+    # test_discord_embed_sanitizers
+    try:
+        import report
+        import weekly_report
+
+        daily_embed = {
+            "title": "T" * 500,
+            "description": "D" * 8000,
+            "fields": [
+                {"name": "📰 Top Headlines", "value": "H" * 3000, "inline": False},
+                {"name": "🎯 Tickers to Watch", "value": "R" * 3000, "inline": False},
+                {"name": "Extra", "value": "E" * 3000, "inline": False},
+            ] * 10,
+            "footer": {"text": "F" * 3000},
+        }
+        sanitized = report._sanitize_embed(daily_embed)
+        assert report._embed_char_count(sanitized) <= report.DISCORD_EMBED_TOTAL_MAX, "daily embed exceeds total limit"
+        assert len(sanitized["title"]) <= report.DISCORD_TITLE_MAX, "daily title exceeds limit"
+        assert len(sanitized["description"]) <= report.DISCORD_DESCRIPTION_MAX, "daily description exceeds limit"
+        assert len(sanitized["fields"]) <= 25, "daily field count exceeds Discord max"
+        for field in sanitized["fields"]:
+            assert len(field["name"]) <= report.DISCORD_FIELD_NAME_MAX, "daily field name exceeds limit"
+            assert len(field["value"]) <= report.DISCORD_FIELD_VALUE_MAX, "daily field value exceeds limit"
+
+        weekly_embed = {
+            "title": "W" * 500,
+            "description": "D" * 8000,
+            "fields": [
+                {"name": "🎯 Next Week Watchlist", "value": "R" * 3000, "inline": False},
+                {"name": "📋 Top Contracts", "value": "C" * 3000, "inline": False},
+            ] * 15,
+            "footer": {"text": "F" * 3000},
+        }
+        sanitized_weekly = weekly_report._sanitize_embed(weekly_embed)
+        assert weekly_report._embed_char_count(sanitized_weekly) <= weekly_report.DISCORD_EMBED_TOTAL_MAX, "weekly embed exceeds total limit"
+        assert len(sanitized_weekly["fields"]) <= 25, "weekly field count exceeds Discord max"
+        for field in sanitized_weekly["fields"]:
+            assert len(field["name"]) <= weekly_report.DISCORD_FIELD_NAME_MAX, "weekly field name exceeds limit"
+            assert len(field["value"]) <= weekly_report.DISCORD_FIELD_VALUE_MAX, "weekly field value exceeds limit"
+
+        runner.record("test_discord_embed_sanitizers", True)
+    except Exception as e:
+        runner.record("test_discord_embed_sanitizers", False, str(e))
+
+    # test_scorecard_old_outcome_schema_compat
+    try:
+        import signal_scorecard
+
+        test_old_outcomes = os.path.join(tempfile.gettempdir(), "test_old_signal_outcomes.csv")
+        today = datetime.now(ET_TZ).strftime("%Y-%m-%d")
+        with open(test_old_outcomes, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "signal_id", "date_et", "time_et", "ticker", "action", "confidence",
+                "price_at_signal", "report_type", "expected_direction", "actionable",
+                "price_1d", "return_1d_pct", "signal_return_1d_pct",
+                "price_5d", "return_5d_pct", "signal_return_5d_pct",
+                "price_10d", "return_10d_pct", "signal_return_10d_pct",
+                "spy_return_5d_pct", "qqq_return_5d_pct", "status", "updated_at_et",
+            ])
+            writer.writeheader()
+            writer.writerow({
+                "signal_id": "old", "date_et": today, "time_et": "08:01", "ticker": "XOM",
+                "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
+                "report_type": "pre-market", "expected_direction": "short", "actionable": "true",
+                "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
+                "price_5d": "95.00", "return_5d_pct": "-5.00", "signal_return_5d_pct": "5.00",
+                "price_10d": "94.00", "return_10d_pct": "-6.00", "signal_return_10d_pct": "6.00",
+                "spy_return_5d_pct": "1.00", "qqq_return_5d_pct": "2.00", "status": "complete",
+                "updated_at_et": today,
+            })
+
+        scorecard = signal_scorecard.build_signal_scorecard(days=14, outcomes_path=test_old_outcomes)
+        assert "Unique actionable BUY/SELL ideas" in scorecard, scorecard
+        assert "n=1" in scorecard, scorecard
+        assert "energy" in scorecard, scorecard
+
+        if os.path.exists(test_old_outcomes):
+            os.remove(test_old_outcomes)
+
+        runner.record("test_scorecard_old_outcome_schema_compat", True)
+    except Exception as e:
+        runner.record("test_scorecard_old_outcome_schema_compat", False, str(e))
+
     return runner.summary()
 
 

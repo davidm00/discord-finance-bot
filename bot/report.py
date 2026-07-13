@@ -363,6 +363,20 @@ def _sanitize_embed(embed: dict) -> dict:
                 break
 
         if not reduced:
+            for f in embed.get("fields") or []:
+                v = str(f.get("value") or "")
+                if len(v) <= 80:
+                    continue
+                new_limit = max(80, len(v) - over)
+                f["value"] = _clamp_text(v, new_limit)
+                reduced = True
+                break
+
+        if not reduced and embed.get("fields"):
+            embed["fields"].pop()
+            reduced = True
+
+        if not reduced:
             break
 
     return embed
