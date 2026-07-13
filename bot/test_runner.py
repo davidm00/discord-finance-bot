@@ -886,6 +886,9 @@ Confidence: HIGH
         assert "Raw actionable calls, including repeats: n=3" in scorecard, scorecard
         assert "repeats excluded from unique score: 1" in scorecard, scorecard
         assert "avg=+1.50%" in scorecard, scorecard
+        assert "By report type:" in scorecard and "pre-market" in scorecard and "post-market" in scorecard, scorecard
+        assert "By theme:" in scorecard and "energy" in scorecard and "defense" in scorecard, scorecard
+        assert "Top ticker buckets:" in scorecard and "XOM" in scorecard and "LMT" in scorecard, scorecard
         assert "WATCH=1" in scorecard, scorecard
         assert "Recent measured unique BUY/SELL ideas" in scorecard, scorecard
 

@@ -16,6 +16,14 @@ from signal_outcomes import OUTCOMES_PATH
 
 ET = pytz.timezone("America/New_York")
 
+THEME_TICKERS = {
+    "defense": {"LMT", "RTX", "NOC", "GD", "BA", "LDOS", "SAIC", "BAH", "HII", "TDG"},
+    "cyber": {"CRWD", "PANW", "ZS", "FTNT", "S", "CYBR", "PLTR"},
+    "energy": {"XOM", "CVX", "COP", "SLB", "HAL", "EOG", "MPC"},
+    "tech": {"NVDA", "AMD", "MSFT", "GOOGL", "META", "AMZN", "AAPL", "QQQ", "MU", "ORCL", "CRM"},
+    "crypto": {"BTC", "ETH", "SOL"},
+}
+
 
 def _safe_float(value: Any) -> float | None:
     try:
@@ -44,6 +52,47 @@ def _summarize_returns(values: list[float]) -> str:
     return (
         f"n={len(values)}, avg={_fmt_pct(mean(values))}, "
         f"median={_fmt_pct(median(values))}, win={wins / len(values) * 100:.0f}%"
+    )
+
+
+def _theme_for_ticker(ticker: str) -> str:
+    ticker = str(ticker or "").strip().upper()
+    for theme, tickers in THEME_TICKERS.items():
+        if ticker in tickers:
+            return theme
+    return "other"
+
+
+def _bucket_summary(
+    rows: list[dict[str, str]],
+    field: str,
+    label: str,
+    limit: int | None = None,
+) -> str:
+    buckets: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        value = _safe_float(row.get("signal_return_5d_pct"))
+        if value is None:
+            continue
+        if field == "theme":
+            key = _theme_for_ticker(row.get("ticker", ""))
+        else:
+            key = str(row.get(field, "") or "unknown").strip() or "unknown"
+        buckets[key].append(value)
+
+    if not buckets:
+        return ""
+
+    items = sorted(
+        buckets.items(),
+        key=lambda item: (len(item[1]), mean(item[1])),
+        reverse=True,
+    )
+    if limit is not None:
+        items = items[:limit]
+
+    return label + ": " + " | ".join(
+        f"{key}: {_summarize_returns(vals)}" for key, vals in items
     )
 
 
@@ -121,6 +170,14 @@ def build_signal_scorecard(
             for confidence, vals in sorted(by_confidence.items(), key=lambda item: order.get(item[0], 99))
         ]
         lines.append("By confidence: " + " | ".join(parts))
+
+    for bucket_line in (
+        _bucket_summary(unique_actionable, "report_type", "By report type"),
+        _bucket_summary(unique_actionable, "theme", "By theme"),
+        _bucket_summary(unique_actionable, "ticker", "Top ticker buckets", limit=5),
+    ):
+        if bucket_line:
+            lines.append(bucket_line)
 
     non_actionable_counts = Counter(
         str(r.get("action", "")).upper()
