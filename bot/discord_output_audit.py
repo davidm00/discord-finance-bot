@@ -200,6 +200,11 @@ def summarize_messages(messages: list[dict[str, Any]]) -> tuple[list[dict[str, A
                     "description_chars": len(desc),
                     "field_count": len(embed.get("fields") or []),
                     "field_names": " | ".join(str(f.get("name") or "") for f in embed.get("fields") or []),
+                    "description": desc,
+                    "fields": {
+                        str(f.get("name") or ""): str(f.get("value") or "")
+                        for f in embed.get("fields") or []
+                    },
                     "recommendation_count": len(recs),
                     "recommendations": "; ".join(
                         f"{r.get('ticker')}:{r.get('rating')}:{r.get('confidence')}" for r in recs
