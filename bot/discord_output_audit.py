@@ -17,7 +17,7 @@ from typing import Any
 import pytz
 import requests
 
-from recommendation_parser import parse_ticker_recommendations
+from recommendation_parser import parse_recommendations
 
 
 ET_TZ = pytz.timezone("America/New_York")
@@ -180,7 +180,7 @@ def summarize_messages(messages: list[dict[str, Any]]) -> tuple[list[dict[str, A
             recs = []
             if "tickers to watch" in desc.lower():
                 with contextlib.redirect_stdout(io.StringIO()):
-                    recs = parse_ticker_recommendations(desc)
+                    recs = parse_recommendations(desc)
             for rec in recs:
                 action_counts[str(rec.get("rating") or "").upper()] += 1
                 ticker_counts[str(rec.get("ticker") or "").upper()] += 1
