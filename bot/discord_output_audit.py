@@ -109,7 +109,7 @@ def validate_embed(embed: dict[str, Any]) -> list[str]:
             warnings.append("missing_financial_advice_disclaimer")
         if "tickers to watch" not in full_text.lower():
             warnings.append("missing_tickers_to_watch_section")
-    if report_type in {"pre-market", "post-market", "weekly", "data-fields"}:
+    if report_type in {"pre-market", "post-market", "weekly"}:
         if "vix" not in full_text.lower():
             warnings.append("missing_vix_reference")
         if "fear" not in full_text.lower() and "greed" not in full_text.lower():
