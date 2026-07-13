@@ -1,0 +1,57 @@
+name: Discord Output Audit
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_messages:
+        description: "Maximum Discord channel messages to scan"
+        required: false
+        default: "500"
+      days:
+        description: "Only scan messages from the last N days; 0 scans back until max_messages"
+        required: false
+        default: "0"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip --disable-pip-version-check
+          pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run Discord audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python bot/discord_output_audit.py \
+            --max-messages "${{ github.event.inputs.max_messages || '500' }}" \
+            --days "${{ github.event.inputs.days || '0' }}" \
+            --output-dir local-output/discord-audit
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discord-output-audit-${{ github.run_number }}
+          path: local-output/discord-audit/
+          retention-days: 30
+          if-no-files-found: error
