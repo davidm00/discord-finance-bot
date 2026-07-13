@@ -267,7 +267,18 @@ def run_mock_tests() -> int:
         signal_logger.ERRORS_PATH = test_errors_csv
 
         try:
-            signal_logger.log_signal("TEST", "BUY", "HIGH", 100.00, "pre-market", "test reason for buy")
+            signal_logger.log_signal(
+                "TEST",
+                "BUY",
+                "HIGH",
+                100.00,
+                "pre-market",
+                "test reason for buy",
+                "earnings",
+                "earnings beat and guidance raise",
+                "5D",
+                "guidance reversal",
+            )
 
             assert os.path.isfile(test_csv), "CSV file not created"
 
@@ -285,11 +296,15 @@ def run_mock_tests() -> int:
             action_idx = header.index("action")
             confidence_idx = header.index("confidence")
             price_idx = header.index("price_at_signal")
+            catalyst_idx = header.index("catalyst_type")
+            catalyst_detail_idx = header.index("catalyst_detail")
 
             assert data_row[ticker_idx] == "TEST", f"ticker mismatch: {data_row[ticker_idx]}"
             assert data_row[action_idx] == "BUY", f"action mismatch: {data_row[action_idx]}"
             assert data_row[confidence_idx] == "HIGH", f"confidence mismatch: {data_row[confidence_idx]}"
             assert data_row[price_idx] == "100.00", f"price mismatch: {data_row[price_idx]}"
+            assert data_row[catalyst_idx] == "earnings", f"catalyst mismatch: {data_row[catalyst_idx]}"
+            assert "guidance" in data_row[catalyst_detail_idx], f"catalyst detail missing: {data_row[catalyst_detail_idx]}"
 
             signal_logger.log_signal("BAD", "GENERAL DYNAMICS", "MEDIUM", 100.00, "weekly", "bad parser row")
             with open(test_csv, "r", encoding="utf-8") as f:
@@ -359,11 +374,19 @@ def run_mock_tests() -> int:
 
 **XOM — ExxonMobil**
 Rating: BUY
+Catalyst Type: geopolitical
+Catalyst Detail: Iran war driving energy demand higher.
+Horizon: 5D
+Risk Trigger: Crude risk premium fades.
 Reason: Iran war driving energy demand higher with 4.59% Treasury yield.
 Confidence: HIGH
 
 **HD — Home Depot**
 Rating: WATCH
+Catalyst Type: earnings
+Catalyst Detail: Earnings Tuesday with margin pressure.
+Horizon: next catalyst
+Risk Trigger: Guidance comes in better than expected.
 Reason: Earnings Tuesday with margin pressure from rising costs.
 Confidence: MEDIUM
 """
@@ -373,6 +396,10 @@ Confidence: MEDIUM
         assert results[0]["rating"] == "BUY", f"daily: expected BUY, got {results[0]['rating']}"
         assert results[0]["confidence"] == "HIGH", f"daily: expected HIGH, got {results[0]['confidence']}"
         assert len(results[0]["reason"]) > 10, "daily: reason too short"
+        assert results[0]["catalyst_type"] == "geopolitical", f"daily: catalyst type missing: {results[0]}"
+        assert "Iran war" in results[0]["catalyst_detail"], f"daily: catalyst detail missing: {results[0]}"
+        assert results[0]["catalyst_horizon"] == "5D", f"daily: horizon missing: {results[0]}"
+        assert "risk premium" in results[0]["risk_trigger"], f"daily: risk trigger missing: {results[0]}"
 
         # Weekly format
         weekly_response = """
@@ -380,6 +407,10 @@ Confidence: MEDIUM
 
 **DAL (Delta Air Lines)** \u2014 WATCH
 Berkshire just put $2.6 billion behind this stock.
+Catalyst Type: news
+Catalyst Detail: Berkshire disclosed a large position.
+Horizon: next week
+Risk Trigger: Airline demand weakens.
 Confidence: Medium
 
 **QQQ (Nasdaq-100 ETF)** \u2014 HOLD
@@ -392,6 +423,7 @@ Confidence: Medium-High
         assert results[0]["rating"] == "WATCH", f"weekly: expected WATCH, got {results[0]['rating']}"
         assert results[1]["confidence"] == "HIGH", f"weekly: Medium-High should normalize to HIGH, got {results[1]['confidence']}"
         assert len(results[0]["reason"]) > 10, "weekly: reason too short"
+        assert results[0]["catalyst_type"] == "news", f"weekly: catalyst type missing: {results[0]}"
 
         # Regression: do not treat company names as ratings/actions.
         malformed_weekly_response = """
@@ -722,7 +754,8 @@ Confidence: HIGH
         with open(test_signals, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=[
                 "date_et", "time_et", "ticker", "action", "confidence",
-                "price_at_signal", "report_type", "reasoning_summary",
+                "price_at_signal", "report_type", "catalyst_type", "catalyst_detail",
+                "catalyst_horizon", "risk_trigger", "reasoning_summary",
             ])
             writer.writeheader()
             writer.writerow({
@@ -733,6 +766,10 @@ Confidence: HIGH
                 "confidence": "HIGH",
                 "price_at_signal": "100.00",
                 "report_type": "pre-market",
+                "catalyst_type": "geopolitical",
+                "catalyst_detail": "oil risk premium",
+                "catalyst_horizon": "5D",
+                "risk_trigger": "ceasefire",
                 "reasoning_summary": "test buy",
             })
             writer.writerow({
@@ -743,6 +780,10 @@ Confidence: HIGH
                 "confidence": "MEDIUM",
                 "price_at_signal": "100.00",
                 "report_type": "post-market",
+                "catalyst_type": "technical",
+                "catalyst_detail": "failed breakout",
+                "catalyst_horizon": "1D",
+                "risk_trigger": "breakout resumes",
                 "reasoning_summary": "test sell",
             })
             writer.writerow({
@@ -753,6 +794,10 @@ Confidence: HIGH
                 "confidence": "MEDIUM",
                 "price_at_signal": "101.00",
                 "report_type": "pre-market",
+                "catalyst_type": "geopolitical",
+                "catalyst_detail": "oil risk premium",
+                "catalyst_horizon": "5D",
+                "risk_trigger": "ceasefire",
                 "reasoning_summary": "repeat buy",
             })
             writer.writerow({
@@ -763,6 +808,10 @@ Confidence: HIGH
                 "confidence": "MEDIUM",
                 "price_at_signal": "100.00",
                 "report_type": "weekly",
+                "catalyst_type": "other",
+                "catalyst_detail": "",
+                "catalyst_horizon": "",
+                "risk_trigger": "",
                 "reasoning_summary": "bad row",
             })
 
@@ -796,6 +845,8 @@ Confidence: HIGH
         sell = outcome_rows[1]
         repeat_buy = outcome_rows[2]
         assert buy["ticker"] == "XOM" and buy["action"] == "BUY", f"bad buy row: {buy}"
+        assert buy["catalyst_type"] == "geopolitical", f"catalyst did not propagate: {buy}"
+        assert buy["risk_trigger"] == "ceasefire", f"risk trigger did not propagate: {buy}"
         assert buy["idea_key"] == "XOM:BUY", f"bad buy idea key: {buy}"
         assert buy["is_repeat_5d"] == "false", f"first BUY should not be repeat: {buy}"
         assert buy["return_5d_pct"] == "4.00", f"expected BUY 5d raw return 4.00, got {buy['return_5d_pct']}"
@@ -827,6 +878,7 @@ Confidence: HIGH
             writer = csv.DictWriter(f, fieldnames=[
                 "signal_id", "date_et", "time_et", "ticker", "action", "confidence",
                 "price_at_signal", "report_type", "expected_direction", "actionable",
+                "catalyst_type", "catalyst_detail", "catalyst_horizon", "risk_trigger",
                 "idea_key", "is_repeat_5d", "repeat_of_signal_id",
                 "price_1d", "return_1d_pct", "signal_return_1d_pct",
                 "price_5d", "return_5d_pct", "signal_return_5d_pct",
@@ -838,6 +890,8 @@ Confidence: HIGH
                 "signal_id": "a", "date_et": today, "time_et": "08:01", "ticker": "XOM",
                 "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
                 "report_type": "pre-market", "expected_direction": "short", "actionable": "true",
+                "catalyst_type": "geopolitical", "catalyst_detail": "oil risk premium",
+                "catalyst_horizon": "5D", "risk_trigger": "ceasefire",
                 "idea_key": "XOM:SELL", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
                 "price_5d": "95.00", "return_5d_pct": "-5.00", "signal_return_5d_pct": "5.00",
@@ -849,6 +903,8 @@ Confidence: HIGH
                 "signal_id": "b", "date_et": today, "time_et": "16:15", "ticker": "LMT",
                 "action": "BUY", "confidence": "MEDIUM", "price_at_signal": "100.00",
                 "report_type": "post-market", "expected_direction": "long", "actionable": "true",
+                "catalyst_type": "government_contract", "catalyst_detail": "new defense award",
+                "catalyst_horizon": "5D", "risk_trigger": "award priced in",
                 "idea_key": "LMT:BUY", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "1.00",
                 "price_5d": "98.00", "return_5d_pct": "-2.00", "signal_return_5d_pct": "-2.00",
@@ -860,6 +916,8 @@ Confidence: HIGH
                 "signal_id": "c", "date_et": today, "time_et": "08:01", "ticker": "RTX",
                 "action": "WATCH", "confidence": "MEDIUM", "price_at_signal": "100.00",
                 "report_type": "pre-market", "expected_direction": "neutral", "actionable": "false",
+                "catalyst_type": "government_contract", "catalyst_detail": "watch defense award",
+                "catalyst_horizon": "next catalyst", "risk_trigger": "no follow through",
                 "idea_key": "", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "",
                 "price_5d": "102.00", "return_5d_pct": "2.00", "signal_return_5d_pct": "",
@@ -872,6 +930,8 @@ Confidence: HIGH
                 "signal_id": "d", "date_et": today, "time_et": "16:16", "ticker": "XOM",
                 "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
                 "report_type": "post-market", "expected_direction": "short", "actionable": "true",
+                "catalyst_type": "geopolitical", "catalyst_detail": "oil risk premium",
+                "catalyst_horizon": "5D", "risk_trigger": "ceasefire",
                 "idea_key": "XOM:SELL", "is_repeat_5d": "true", "repeat_of_signal_id": "a",
                 "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
                 "price_5d": "94.00", "return_5d_pct": "-6.00", "signal_return_5d_pct": "6.00",
@@ -887,6 +947,7 @@ Confidence: HIGH
         assert "repeats excluded from unique score: 1" in scorecard, scorecard
         assert "avg=+1.50%" in scorecard, scorecard
         assert "By report type:" in scorecard and "pre-market" in scorecard and "post-market" in scorecard, scorecard
+        assert "By catalyst:" in scorecard and "geopolitical" in scorecard and "government_contract" in scorecard, scorecard
         assert "By theme:" in scorecard and "energy" in scorecard and "defense" in scorecard, scorecard
         assert "Top ticker buckets:" in scorecard and "XOM" in scorecard and "LMT" in scorecard, scorecard
         assert "WATCH=1" in scorecard, scorecard

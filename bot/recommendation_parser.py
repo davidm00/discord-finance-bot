@@ -7,6 +7,23 @@ import sys
 
 RATINGS = {"BUY", "SELL", "HOLD", "WATCH"}
 CONFIDENCE = {"HIGH", "MEDIUM", "LOW"}
+CATALYST_TYPES = {
+    "earnings",
+    "guidance",
+    "macro",
+    "rates",
+    "inflation",
+    "geopolitical",
+    "political_trade",
+    "government_contract",
+    "news",
+    "technical",
+    "sentiment",
+    "crypto",
+    "valuation",
+    "sector_rotation",
+    "other",
+}
 
 
 _RATING_RE = re.compile(r"\b(BUY|SELL|HOLD|WATCH)\b", re.IGNORECASE)
@@ -52,6 +69,40 @@ def _extract_confidence(raw: str) -> str:
     return confidence if confidence in CONFIDENCE else ""
 
 
+def _normalize_catalyst_type(raw: str) -> str:
+    text = str(raw or "").strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    aliases = {
+        "political": "political_trade",
+        "politician_trade": "political_trade",
+        "congress_trade": "political_trade",
+        "congressional_trade": "political_trade",
+        "contract": "government_contract",
+        "gov_contract": "government_contract",
+        "government_contracts": "government_contract",
+        "rate": "rates",
+        "interest_rates": "rates",
+        "fed": "rates",
+        "federal_reserve": "rates",
+        "geo": "geopolitical",
+        "geopolitics": "geopolitical",
+        "headline": "news",
+        "headlines": "news",
+        "technicals": "technical",
+        "market_sentiment": "sentiment",
+        "sector": "sector_rotation",
+    }
+    text = aliases.get(text, text)
+    return text if text in CATALYST_TYPES else "other"
+
+
+def _strip_label(line: str, label: str) -> str | None:
+    m = re.search(rf"\b(?:{label})\s*[:\-—–]\s*(.+)", line, re.IGNORECASE)
+    if not m:
+        return None
+    return m.group(1).strip().replace("**", "").replace("*", "")
+
+
 def _detect_format(block_lines: list[str]) -> str:
     """Return 'daily' if block contains 'Rating:' label, else 'weekly'."""
     for line in block_lines:
@@ -70,6 +121,30 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
     confidence = ""
     bull_case = ""
     bear_case = ""
+    catalyst_type = ""
+    catalyst_detail = ""
+    catalyst_horizon = ""
+    risk_trigger = ""
+
+    def capture_structured_field(line: str) -> bool:
+        nonlocal catalyst_type, catalyst_detail, catalyst_horizon, risk_trigger
+        value = _strip_label(line, "catalyst(?:\\s+type)?")
+        if value is not None:
+            catalyst_type = _normalize_catalyst_type(value)
+            return True
+        value = _strip_label(line, "catalyst\\s+detail")
+        if value is not None:
+            catalyst_detail = value
+            return True
+        value = _strip_label(line, "horizon|catalyst\\s+horizon")
+        if value is not None:
+            catalyst_horizon = value
+            return True
+        value = _strip_label(line, "risk(?:\\s+trigger)?")
+        if value is not None:
+            risk_trigger = value
+            return True
+        return False
 
     if fmt == "daily":
         # Daily: explicit Rating:/Reason:/Confidence: labels + optional Bull:/Bear:
@@ -80,6 +155,9 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             if not stripped:
                 if in_reason:
                     reason_lines.append("")
+                continue
+            if capture_structured_field(stripped):
+                in_reason = False
                 continue
 
             # Bull case extraction
@@ -191,6 +269,8 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
             stripped = line.strip()
             if not stripped:
                 continue
+            if capture_structured_field(stripped):
+                continue
             m_conf = re.search(r"\bconfidence\s*[:\-—–]\s*([^\n]+)", stripped, re.IGNORECASE)
             if m_conf:
                 if not confidence:
@@ -216,6 +296,9 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
 
     # Clean up reason: remove markdown bold/italic
     reason = reason.replace("**", "").replace("*", "").strip()
+    catalyst_detail = catalyst_detail.replace("**", "").replace("*", "").strip()
+    catalyst_horizon = catalyst_horizon.replace("**", "").replace("*", "").strip()
+    risk_trigger = risk_trigger.replace("**", "").replace("*", "").strip()
 
     print(f"[parser] Raw reason text: {reason[:100]}")
 
@@ -225,6 +308,10 @@ def _parse_block(block_lines: list[str], ticker: str, header_rating: str) -> dic
         # Add bull/bear if present (backwards compatible)
         rec["bull_case"] = bull_case if bull_case else None
         rec["bear_case"] = bear_case if bear_case else None
+        rec["catalyst_type"] = catalyst_type or "other"
+        rec["catalyst_detail"] = catalyst_detail or None
+        rec["catalyst_horizon"] = catalyst_horizon or None
+        rec["risk_trigger"] = risk_trigger or None
         return rec
     print(
         f"[parser] Skipping invalid recommendation: ticker={ticker!r}, "

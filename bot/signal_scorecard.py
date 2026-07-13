@@ -173,6 +173,7 @@ def build_signal_scorecard(
 
     for bucket_line in (
         _bucket_summary(unique_actionable, "report_type", "By report type"),
+        _bucket_summary(unique_actionable, "catalyst_type", "By catalyst"),
         _bucket_summary(unique_actionable, "theme", "By theme"),
         _bucket_summary(unique_actionable, "ticker", "Top ticker buckets", limit=5),
     ):
@@ -198,10 +199,12 @@ def build_signal_scorecard(
     if measured_rows:
         lines.append("Recent measured unique BUY/SELL ideas:")
         for row in measured_rows[:max_recent]:
+            catalyst = str(row.get("catalyst_type", "") or "").strip()
+            catalyst_text = f"; catalyst={catalyst}" if catalyst else ""
             lines.append(
                 f"- {row.get('date_et','')} {row.get('ticker','')} {row.get('action','')} "
                 f"({row.get('confidence','')}): 5D signal return "
-                f"{_fmt_pct(_safe_float(row.get('signal_return_5d_pct')))}; status={row.get('status','')}"
+                f"{_fmt_pct(_safe_float(row.get('signal_return_5d_pct')))}; status={row.get('status','')}{catalyst_text}"
             )
 
     lines.append(
