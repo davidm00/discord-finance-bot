@@ -11,7 +11,7 @@ import csv
 import hashlib
 import math
 import os
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Any
 
 import pytz
@@ -34,6 +34,9 @@ OUTCOME_HEADERS = [
     "report_type",
     "expected_direction",
     "actionable",
+    "idea_key",
+    "is_repeat_5d",
+    "repeat_of_signal_id",
     "price_1d",
     "return_1d_pct",
     "signal_return_1d_pct",
@@ -163,6 +166,10 @@ def _expected_direction(action: str) -> str:
     return "neutral"
 
 
+def _idea_key(ticker: str, action: str) -> str:
+    return f"{ticker.upper()}:{action.upper()}"
+
+
 def _benchmark_return(
     benchmark_points: list[tuple[datetime.date, float]],
     signal_dt: datetime,
@@ -225,6 +232,9 @@ def build_outcome_row(
         "report_type": row.get("report_type", "").strip(),
         "expected_direction": _expected_direction(action),
         "actionable": "true" if action in {"BUY", "SELL"} else "false",
+        "idea_key": _idea_key(ticker, action) if action in {"BUY", "SELL"} else "",
+        "is_repeat_5d": "false",
+        "repeat_of_signal_id": "",
         "price_1d": _fmt_num(prices["1d"]),
         "return_1d_pct": _fmt_num(raw_returns["1d"]),
         "signal_return_1d_pct": _fmt_num(signal_returns["1d"]),
@@ -239,6 +249,39 @@ def build_outcome_row(
         "status": status,
         "updated_at_et": datetime.now(ET).strftime("%Y-%m-%d %H:%M ET"),
     }
+
+
+def _outcome_dt(row: dict[str, str]) -> datetime | None:
+    return _parse_signal_dt({"date_et": row.get("date_et", ""), "time_et": row.get("time_et", "")})
+
+
+def annotate_repeated_ideas(rows: list[dict[str, str]], window_days: int = 5) -> None:
+    """Mark repeated actionable ticker/action ideas within a rolling calendar window."""
+    last_primary_by_key: dict[str, tuple[datetime, str]] = {}
+    window = timedelta(days=window_days)
+
+    for row in rows:
+        row["is_repeat_5d"] = "false"
+        row["repeat_of_signal_id"] = ""
+
+    for row in sorted(rows, key=lambda r: (r.get("date_et", ""), r.get("time_et", ""), r.get("signal_id", ""))):
+        if str(row.get("actionable", "")).lower() != "true":
+            continue
+        key = row.get("idea_key") or _idea_key(row.get("ticker", ""), row.get("action", ""))
+        row["idea_key"] = key
+        dt = _outcome_dt(row)
+        if dt is None:
+            continue
+
+        prior = last_primary_by_key.get(key)
+        if prior and dt - prior[0] <= window:
+            row["is_repeat_5d"] = "true"
+            row["repeat_of_signal_id"] = prior[1]
+            continue
+
+        row["is_repeat_5d"] = "false"
+        row["repeat_of_signal_id"] = ""
+        last_primary_by_key[key] = (dt, row.get("signal_id", ""))
 
 
 def update_signal_outcomes(
@@ -262,6 +305,8 @@ def update_signal_outcomes(
             skipped += 1
             continue
         rows.append(outcome)
+
+    annotate_repeated_ideas(rows)
 
     os.makedirs(os.path.dirname(outcomes_path), exist_ok=True)
     tmp_path = outcomes_path + ".tmp"

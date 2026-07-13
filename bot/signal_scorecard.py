@@ -76,21 +76,34 @@ def build_signal_scorecard(
         return ""
 
     actionable = [r for r in recent if str(r.get("actionable", "")).lower() == "true"]
-    measured_5d = [
+    raw_measured_5d = [
         _safe_float(r.get("signal_return_5d_pct"))
         for r in actionable
         if _safe_float(r.get("signal_return_5d_pct")) is not None
     ]
-    measured_5d = [v for v in measured_5d if v is not None]
+    raw_measured_5d = [v for v in raw_measured_5d if v is not None]
+
+    unique_actionable = [
+        r for r in actionable
+        if str(r.get("is_repeat_5d", "false")).lower() != "true"
+    ]
+    unique_measured_5d = [
+        _safe_float(r.get("signal_return_5d_pct"))
+        for r in unique_actionable
+        if _safe_float(r.get("signal_return_5d_pct")) is not None
+    ]
+    unique_measured_5d = [v for v in unique_measured_5d if v is not None]
+    repeat_count = max(0, len(actionable) - len(unique_actionable))
 
     lines = [
         f"SIGNAL SCORECARD (last {days} days; measured from signal_outcomes.csv):",
-        f"Actionable BUY/SELL 5D directional performance: {_summarize_returns(measured_5d)}",
+        f"Unique actionable BUY/SELL ideas, 5D directional performance: {_summarize_returns(unique_measured_5d)}",
+        f"Raw actionable calls, including repeats: {_summarize_returns(raw_measured_5d)}; repeats excluded from unique score: {repeat_count}",
     ]
 
     by_action: dict[str, list[float]] = defaultdict(list)
     by_confidence: dict[str, list[float]] = defaultdict(list)
-    for row in actionable:
+    for row in unique_actionable:
         value = _safe_float(row.get("signal_return_5d_pct"))
         if value is None:
             continue
@@ -121,12 +134,12 @@ def build_signal_scorecard(
         )
 
     measured_rows = [
-        r for r in actionable
+        r for r in unique_actionable
         if _safe_float(r.get("signal_return_5d_pct")) is not None
     ]
     measured_rows.sort(key=lambda r: (r.get("date_et", ""), r.get("time_et", "")), reverse=True)
     if measured_rows:
-        lines.append("Recent measured BUY/SELL calls:")
+        lines.append("Recent measured unique BUY/SELL ideas:")
         for row in measured_rows[:max_recent]:
             lines.append(
                 f"- {row.get('date_et','')} {row.get('ticker','')} {row.get('action','')} "

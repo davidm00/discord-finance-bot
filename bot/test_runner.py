@@ -746,6 +746,16 @@ Confidence: HIGH
                 "reasoning_summary": "test sell",
             })
             writer.writerow({
+                "date_et": "2026-01-03",
+                "time_et": "08:01",
+                "ticker": "XOM",
+                "action": "BUY",
+                "confidence": "MEDIUM",
+                "price_at_signal": "101.00",
+                "report_type": "pre-market",
+                "reasoning_summary": "repeat buy",
+            })
+            writer.writerow({
                 "date_et": "2026-01-02",
                 "time_et": "08:01",
                 "ticker": "BAD",
@@ -777,19 +787,27 @@ Confidence: HIGH
         finally:
             signal_outcomes._history_points = original_history_points
 
-        assert count == 2, f"expected 2 outcome rows, got {count}"
+        assert count == 3, f"expected 3 outcome rows, got {count}"
         with open(test_outcomes, "r", newline="", encoding="utf-8") as f:
             outcome_rows = list(csv.DictReader(f))
 
-        assert len(outcome_rows) == 2, f"expected 2 written rows, got {len(outcome_rows)}"
+        assert len(outcome_rows) == 3, f"expected 3 written rows, got {len(outcome_rows)}"
         buy = outcome_rows[0]
         sell = outcome_rows[1]
+        repeat_buy = outcome_rows[2]
         assert buy["ticker"] == "XOM" and buy["action"] == "BUY", f"bad buy row: {buy}"
+        assert buy["idea_key"] == "XOM:BUY", f"bad buy idea key: {buy}"
+        assert buy["is_repeat_5d"] == "false", f"first BUY should not be repeat: {buy}"
         assert buy["return_5d_pct"] == "4.00", f"expected BUY 5d raw return 4.00, got {buy['return_5d_pct']}"
         assert buy["signal_return_5d_pct"] == "4.00", f"expected BUY signal return 4.00, got {buy['signal_return_5d_pct']}"
         assert sell["action"] == "SELL", f"bad sell row: {sell}"
+        assert sell["idea_key"] == "XOM:SELL", f"bad sell idea key: {sell}"
+        assert sell["is_repeat_5d"] == "false", f"SELL should not repeat BUY idea: {sell}"
         assert sell["return_5d_pct"] == "5.00", f"expected SELL raw return 5.00, got {sell['return_5d_pct']}"
         assert sell["signal_return_5d_pct"] == "-5.00", f"expected SELL directional return -5.00, got {sell['signal_return_5d_pct']}"
+        assert repeat_buy["action"] == "BUY", f"bad repeat row: {repeat_buy}"
+        assert repeat_buy["is_repeat_5d"] == "true", f"second XOM BUY should be repeat: {repeat_buy}"
+        assert repeat_buy["repeat_of_signal_id"] == buy["signal_id"], f"repeat should point at first BUY: {repeat_buy}"
 
         for p in (test_signals, test_outcomes):
             if os.path.exists(p):
@@ -809,6 +827,7 @@ Confidence: HIGH
             writer = csv.DictWriter(f, fieldnames=[
                 "signal_id", "date_et", "time_et", "ticker", "action", "confidence",
                 "price_at_signal", "report_type", "expected_direction", "actionable",
+                "idea_key", "is_repeat_5d", "repeat_of_signal_id",
                 "price_1d", "return_1d_pct", "signal_return_1d_pct",
                 "price_5d", "return_5d_pct", "signal_return_5d_pct",
                 "price_10d", "return_10d_pct", "signal_return_10d_pct",
@@ -819,6 +838,7 @@ Confidence: HIGH
                 "signal_id": "a", "date_et": today, "time_et": "08:01", "ticker": "XOM",
                 "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
                 "report_type": "pre-market", "expected_direction": "short", "actionable": "true",
+                "idea_key": "XOM:SELL", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
                 "price_5d": "95.00", "return_5d_pct": "-5.00", "signal_return_5d_pct": "5.00",
                 "price_10d": "94.00", "return_10d_pct": "-6.00", "signal_return_10d_pct": "6.00",
@@ -829,6 +849,7 @@ Confidence: HIGH
                 "signal_id": "b", "date_et": today, "time_et": "16:15", "ticker": "LMT",
                 "action": "BUY", "confidence": "MEDIUM", "price_at_signal": "100.00",
                 "report_type": "post-market", "expected_direction": "long", "actionable": "true",
+                "idea_key": "LMT:BUY", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "1.00",
                 "price_5d": "98.00", "return_5d_pct": "-2.00", "signal_return_5d_pct": "-2.00",
                 "price_10d": "", "return_10d_pct": "", "signal_return_10d_pct": "",
@@ -839,6 +860,7 @@ Confidence: HIGH
                 "signal_id": "c", "date_et": today, "time_et": "08:01", "ticker": "RTX",
                 "action": "WATCH", "confidence": "MEDIUM", "price_at_signal": "100.00",
                 "report_type": "pre-market", "expected_direction": "neutral", "actionable": "false",
+                "idea_key": "", "is_repeat_5d": "false", "repeat_of_signal_id": "",
                 "price_1d": "101.00", "return_1d_pct": "1.00", "signal_return_1d_pct": "",
                 "price_5d": "102.00", "return_5d_pct": "2.00", "signal_return_5d_pct": "",
                 "price_10d": "103.00", "return_10d_pct": "3.00", "signal_return_10d_pct": "",
@@ -846,12 +868,26 @@ Confidence: HIGH
                 "updated_at_et": today,
             })
 
+            writer.writerow({
+                "signal_id": "d", "date_et": today, "time_et": "16:16", "ticker": "XOM",
+                "action": "SELL", "confidence": "HIGH", "price_at_signal": "100.00",
+                "report_type": "post-market", "expected_direction": "short", "actionable": "true",
+                "idea_key": "XOM:SELL", "is_repeat_5d": "true", "repeat_of_signal_id": "a",
+                "price_1d": "99.00", "return_1d_pct": "-1.00", "signal_return_1d_pct": "1.00",
+                "price_5d": "94.00", "return_5d_pct": "-6.00", "signal_return_5d_pct": "6.00",
+                "price_10d": "93.00", "return_10d_pct": "-7.00", "signal_return_10d_pct": "7.00",
+                "spy_return_5d_pct": "1.00", "qqq_return_5d_pct": "2.00", "status": "complete",
+                "updated_at_et": today,
+            })
+
         scorecard = signal_scorecard.build_signal_scorecard(days=14, outcomes_path=test_outcomes)
         assert "SIGNAL SCORECARD" in scorecard, "missing scorecard header"
-        assert "Actionable BUY/SELL 5D directional performance: n=2" in scorecard, scorecard
+        assert "Unique actionable BUY/SELL ideas, 5D directional performance: n=2" in scorecard, scorecard
+        assert "Raw actionable calls, including repeats: n=3" in scorecard, scorecard
+        assert "repeats excluded from unique score: 1" in scorecard, scorecard
         assert "avg=+1.50%" in scorecard, scorecard
         assert "WATCH=1" in scorecard, scorecard
-        assert "Recent measured BUY/SELL calls" in scorecard, scorecard
+        assert "Recent measured unique BUY/SELL ideas" in scorecard, scorecard
 
         if os.path.exists(test_outcomes):
             os.remove(test_outcomes)
