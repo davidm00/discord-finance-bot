@@ -14,6 +14,7 @@ import yfinance as yf
 ET = pytz.timezone("America/New_York")
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "signals.csv")
+ERRORS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "signal_errors.csv")
 
 HEADERS = [
     "date_et",
@@ -23,6 +24,17 @@ HEADERS = [
     "confidence",
     "price_at_signal",
     "report_type",
+    "reasoning_summary",
+]
+
+ERROR_HEADERS = [
+    "logged_at_et",
+    "stage",
+    "ticker",
+    "action",
+    "confidence",
+    "report_type",
+    "error",
     "reasoning_summary",
 ]
 
@@ -66,6 +78,46 @@ def _normalize_confidence(confidence: str) -> str:
     return raw
 
 
+def _clean_cell(value: str, limit: int = 200) -> str:
+    return str(value or "").replace("\n", " ").replace("\r", " ").strip()[:limit]
+
+
+def log_signal_error(
+    stage: str,
+    ticker: str,
+    action: str,
+    confidence: str,
+    report_type: str,
+    error: str,
+    reasoning: str = "",
+) -> None:
+    """Append rejected recommendation details to a separate diagnostics CSV."""
+    data_dir = os.path.dirname(ERRORS_PATH)
+    os.makedirs(data_dir, exist_ok=True)
+
+    file_exists = os.path.isfile(ERRORS_PATH)
+    now_et = datetime.now(ET).strftime("%Y-%m-%d %H:%M ET")
+    row = [
+        now_et,
+        _clean_cell(stage, 50),
+        _clean_cell(ticker, 20).upper(),
+        _clean_cell(action, 80).upper(),
+        _clean_cell(confidence, 40).upper(),
+        _clean_cell(report_type, 40),
+        _clean_cell(error, 200),
+        _clean_cell(reasoning, 200),
+    ]
+
+    try:
+        with open(ERRORS_PATH, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(ERROR_HEADERS)
+            writer.writerow(row)
+    except Exception as exc:
+        print(f"[signal_logger] WARNING: failed to write signal error: {exc}", file=sys.stderr)
+
+
 def log_signal(
     ticker: str,
     action: str,
@@ -81,12 +133,15 @@ def log_signal(
 
     if not ticker:
         print("[signal_logger] WARNING: skipped signal with empty ticker", file=sys.stderr)
+        log_signal_error("log_signal", ticker, action, confidence, report_type, "empty ticker", reasoning)
         return
     if action not in VALID_ACTIONS:
         print(f"[signal_logger] WARNING: skipped {ticker}; invalid action: {action!r}", file=sys.stderr)
+        log_signal_error("log_signal", ticker, action, confidence, report_type, "invalid action", reasoning)
         return
     if confidence not in VALID_CONFIDENCE:
         print(f"[signal_logger] WARNING: skipped {ticker}; invalid confidence: {confidence!r}", file=sys.stderr)
+        log_signal_error("log_signal", ticker, action, confidence, report_type, "invalid confidence", reasoning)
         return
     if price is not None:
         try:
@@ -109,7 +164,7 @@ def log_signal(
     time_et = now_et.strftime("%H:%M")
 
     price_str = f"{price:.2f}" if price is not None else "N/A"
-    reason_clean = (reasoning or "").replace("\n", " ").replace("\r", " ").strip()[:100]
+    reason_clean = _clean_cell(reasoning, 100)
 
     row = [
         date_et,
@@ -145,12 +200,15 @@ def log_recommendations(recs: list[dict], report_type: str) -> int:
 
         if not ticker:
             print("[signal_logger] WARNING: skipped recommendation with empty ticker", file=sys.stderr)
+            log_signal_error("log_recommendations", ticker, action, confidence, report_type, "empty ticker", reasoning)
             continue
         if action not in VALID_ACTIONS:
             print(f"[signal_logger] WARNING: skipped {ticker}; invalid action: {action!r}", file=sys.stderr)
+            log_signal_error("log_recommendations", ticker, action, confidence, report_type, "invalid action", reasoning)
             continue
         if confidence not in VALID_CONFIDENCE:
             print(f"[signal_logger] WARNING: skipped {ticker}; invalid confidence: {confidence!r}", file=sys.stderr)
+            log_signal_error("log_recommendations", ticker, action, confidence, report_type, "invalid confidence", reasoning)
             continue
 
         if ticker not in price_cache:

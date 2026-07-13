@@ -66,6 +66,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           key: signals-csv-manual-seed-${{ github.run_id }}
 
       - name: Upload corrected signal data artifact
@@ -75,5 +76,6 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           retention-days: 90
           if-no-files-found: error

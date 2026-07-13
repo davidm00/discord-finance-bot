@@ -108,6 +108,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -139,6 +140,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -149,6 +151,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           retention-days: 90
           if-no-files-found: warn
 
@@ -214,6 +217,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -245,6 +249,7 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -255,5 +260,6 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
           retention-days: 90
           if-no-files-found: warn

@@ -255,12 +255,16 @@ def run_mock_tests() -> int:
         import signal_logger
 
         test_csv = os.path.join(tempfile.gettempdir(), "test_signals.csv")
-        if os.path.exists(test_csv):
-            os.remove(test_csv)
+        test_errors_csv = os.path.join(tempfile.gettempdir(), "test_signal_errors.csv")
+        for p in (test_csv, test_errors_csv):
+            if os.path.exists(p):
+                os.remove(p)
 
         # Monkeypatch CSV_PATH
         original_path = signal_logger.CSV_PATH
+        original_errors_path = signal_logger.ERRORS_PATH
         signal_logger.CSV_PATH = test_csv
+        signal_logger.ERRORS_PATH = test_errors_csv
 
         try:
             signal_logger.log_signal("TEST", "BUY", "HIGH", 100.00, "pre-market", "test reason for buy")
@@ -291,6 +295,13 @@ def run_mock_tests() -> int:
             with open(test_csv, "r", encoding="utf-8") as f:
                 rows_after_invalid = list(csv.reader(f))
             assert len(rows_after_invalid) == len(rows), "invalid action should not be appended"
+            assert os.path.isfile(test_errors_csv), "signal_errors.csv should be created for invalid action"
+            with open(test_errors_csv, "r", encoding="utf-8") as f:
+                error_rows = list(csv.DictReader(f))
+            assert len(error_rows) == 1, f"expected 1 error row, got {len(error_rows)}"
+            assert error_rows[0]["ticker"] == "BAD", f"error ticker mismatch: {error_rows[0]}"
+            assert error_rows[0]["action"] == "GENERAL DYNAMICS", f"error action mismatch: {error_rows[0]}"
+            assert error_rows[0]["error"] == "invalid action", f"error reason mismatch: {error_rows[0]}"
 
             captured_symbols = []
             original_ticker = signal_logger.yf.Ticker
@@ -331,8 +342,10 @@ def run_mock_tests() -> int:
             runner.record("test_signal_logging", True)
         finally:
             signal_logger.CSV_PATH = original_path
-            if os.path.exists(test_csv):
-                os.remove(test_csv)
+            signal_logger.ERRORS_PATH = original_errors_path
+            for p in (test_csv, test_errors_csv):
+                if os.path.exists(p):
+                    os.remove(p)
     except Exception as e:
         runner.record("test_signal_logging", False, str(e))
 
