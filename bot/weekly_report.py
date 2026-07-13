@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -108,6 +109,40 @@ def _section_aware_truncate(text: str, limit: int) -> str:
     if last_nl > limit * 0.5:
         return text[:last_nl].rstrip()
     return text[:limit - 1].rstrip() + "…"
+
+
+def _truncate_preserving_weekly_tickers(text: str, limit: int) -> str:
+    """Trim weekly analysis while preserving the actionable ticker section when present."""
+    if len(text) <= limit:
+        return text
+
+    marker_match = None
+    for pattern in (
+        r"\n\*\*Tickers to Watch Next Week\*\*",
+        r"\n\*\*Tickers to Watch\*\*",
+    ):
+        matches = list(re.finditer(pattern, text, re.IGNORECASE))
+        if matches:
+            marker_match = matches[-1]
+            break
+
+    if marker_match is None:
+        return _section_aware_truncate(text, limit)
+
+    prefix = text[: marker_match.start()].rstrip()
+    ticker_section = text[marker_match.start():].strip()
+    # If Claude only emitted the header, the normal section truncation is safer.
+    if len(ticker_section.splitlines()) <= 2:
+        return _section_aware_truncate(text, limit)
+
+    separator = "\n\n---\n\n"
+    reserved = len(ticker_section) + len(separator)
+    if reserved >= limit:
+        return _section_aware_truncate(ticker_section, limit)
+
+    prefix_limit = limit - reserved
+    trimmed_prefix = _section_aware_truncate(prefix, prefix_limit).rstrip()
+    return f"{trimmed_prefix}{separator}{ticker_section}".strip()
 
 
 def _embed_char_count(embed: dict) -> int:
@@ -721,8 +756,8 @@ def main() -> int:
 
             # Pre-flight: ensure analysis fits embed description (max 4096, target 3800)
             if len(analysis) > 3800:
-                print(f"[weekly] WARNING: Analysis exceeds 3800 chars, truncating at section boundary")
-                analysis = _section_aware_truncate(analysis, 3800)
+                print(f"[weekly] WARNING: Analysis exceeds 3800 chars, truncating while preserving ticker section")
+                analysis = _truncate_preserving_weekly_tickers(analysis, 3800)
         except Exception as exc:
             print(f"[weekly] WARNING: Claude call failed: {exc}")
             analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE

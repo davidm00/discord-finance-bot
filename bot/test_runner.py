@@ -1071,6 +1071,27 @@ Confidence: HIGH
         assert "STRUCTURED SIGNAL LOG" in fallback_prompt, "raw fallback should appear when scorecard is unavailable"
         assert "RAW | BUY" in fallback_prompt, "raw fallback signal row missing"
 
+        long_weekly = (
+            "**Week in Review**\n" + ("A" * 2500) +
+            "\n\n---\n\n**Bot Scorecard**\n" + ("B" * 1800) +
+            "\n\n---\n\n**Tickers to Watch Next Week**\n\n"
+            "**XOM — ExxonMobil**\n"
+            "Bull: oil is up.\n"
+            "Bear: ceasefire risk.\n"
+            "Rating: BUY\n"
+            "Catalyst Type: geopolitical\n"
+            "Catalyst Detail: Hormuz escalation\n"
+            "Horizon: next week\n"
+            "Risk Trigger: ceasefire\n"
+            "Reason: oil shock supports XOM.\n"
+            "Confidence: MEDIUM\n"
+        )
+        trimmed = weekly_report._truncate_preserving_weekly_tickers(long_weekly, 1200)
+        assert len(trimmed) <= 1200, "weekly truncation exceeded limit"
+        assert "**Tickers to Watch Next Week**" in trimmed, "weekly truncation dropped ticker header"
+        assert "Catalyst Type: geopolitical" in trimmed, "weekly truncation dropped structured catalyst"
+        assert "Rating: BUY" in trimmed, "weekly truncation dropped ticker rating"
+
         runner.record("test_weekly_prompt_scorecard_precedence", True)
     except Exception as e:
         runner.record("test_weekly_prompt_scorecard_precedence", False, str(e))
