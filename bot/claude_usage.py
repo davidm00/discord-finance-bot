@@ -70,6 +70,21 @@ def get_claude_model(default: str = "claude-sonnet-4-6") -> str:
     return (os.getenv("CLAUDE_MODEL") or default).strip() or default
 
 
+def get_claude_effort(default: str = "low") -> str:
+    return (os.getenv("CLAUDE_EFFORT") or default).strip() or default
+
+
+def extract_message_text(message: Any) -> str:
+    parts = getattr(message, "content", None) or []
+    text_parts: list[str] = []
+    for part in parts:
+        part_type = getattr(part, "type", "")
+        text = getattr(part, "text", None)
+        if (part_type in {"", "text"} or part_type is None) and text:
+            text_parts.append(str(text))
+    return "\n".join(text_parts).strip()
+
+
 def _to_int(value: Any) -> int:
     try:
         return int(value or 0)

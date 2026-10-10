@@ -27,7 +27,7 @@ from cache_manager import install_cache
 install_cache()
 
 from claude_analysis import DEFAULT_MODEL, DISCLAIMER_LINE
-from claude_usage import get_claude_model, log_claude_usage
+from claude_usage import extract_message_text, get_claude_effort, get_claude_model, log_claude_usage
 from history_fetcher import fetch_weekly_history
 from market_calendar import get_market_state
 from market_data import fetch_macro_context
@@ -740,6 +740,7 @@ def main() -> int:
 
     prompt_token_estimate = len(user_prompt) // 4
     model = get_claude_model(DEFAULT_MODEL)
+    effort = get_claude_effort()
     print(f"[weekly] Prompt token estimate: ~{prompt_token_estimate} tokens")
 
     analysis = ""
@@ -749,13 +750,14 @@ def main() -> int:
         analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
     else:
         try:
-            print(f"[weekly] Calling Claude API (model={model})...")
+            print(f"[weekly] Calling Claude API (model={model}, effort={effort})...")
             client = Anthropic(api_key=api_key)
 
             print("[claude] Prompt caching enabled on system prompt")
             msg = client.messages.create(
                 model=model,
                 max_tokens=2000,
+                output_config={"effort": effort},
                 system=[
                     {
                         "type": "text",
@@ -781,9 +783,7 @@ def main() -> int:
                 if cache_read is not None:
                     print(f"[claude] cache_read_input_tokens: {cache_read}")
 
-            parts = getattr(msg, "content", None)
-            text = getattr(parts[0], "text", None) if parts else None
-            analysis = (str(text).strip() if text else "").strip()
+            analysis = extract_message_text(msg)
             if not analysis:
                 analysis = "Weekly analysis unavailable at this time."
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from anthropic import Anthropic
 
-from claude_usage import get_claude_model, log_claude_usage
+from claude_usage import extract_message_text, get_claude_effort, get_claude_model, log_claude_usage
 
 DEFAULT_MODEL = get_claude_model()
 
@@ -389,8 +389,9 @@ def generate_analysis(
 
     prompt_token_estimate = len(full_prompt) // 4
     model = get_claude_model(DEFAULT_MODEL)
+    effort = get_claude_effort()
     print(f"[claude] Prompt token estimate: ~{prompt_token_estimate} tokens")
-    print(f"[claude] Calling Claude API (model={model})...")
+    print(f"[claude] Calling Claude API (model={model}, effort={effort})...")
 
     try:
         client = Anthropic(api_key=api_key)
@@ -399,6 +400,7 @@ def generate_analysis(
         msg = client.messages.create(
             model=model,
             max_tokens=1500,
+            output_config={"effort": effort},
             system=[
                 {
                     "type": "text",
@@ -424,17 +426,8 @@ def generate_analysis(
             if cache_read is not None:
                 print(f"[claude] cache_read_input_tokens: {cache_read}")
 
-        parts = getattr(msg, "content", None)
-        if not parts:
-            return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
-
-        text = getattr(parts[0], "text", None)
-        out = (str(text).strip() if text else "").strip()
-        if not out:
-            return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
-
+        out = extract_message_text(msg)
         print(f"[claude] Response received: {len(out)} chars")
-
         if usage:
             log_claude_usage(
                 report_type=report_type,
@@ -443,6 +436,9 @@ def generate_analysis(
                 prompt_token_estimate=prompt_token_estimate,
                 response_chars=len(out),
             )
+
+        if not out:
+            return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
         if DISCLAIMER_LINE not in out:
             out = out.rstrip() + "\n" + DISCLAIMER_LINE
