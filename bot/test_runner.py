@@ -1149,6 +1149,46 @@ Confidence: HIGH
     except Exception as e:
         runner.record("test_discord_embed_sanitizers", False, str(e))
 
+    # test_claude_usage_cost_logging
+    try:
+        import claude_usage
+
+        class FakeUsage:
+            input_tokens = 1000
+            output_tokens = 200
+            cache_creation_input_tokens = 100
+            cache_read_input_tokens = 50
+
+        test_usage = os.path.join(tempfile.gettempdir(), "test_claude_usage.csv")
+        if os.path.exists(test_usage):
+            os.remove(test_usage)
+
+        costs = claude_usage.estimate_usage_cost("claude-sonnet-5-5", 1000, 200, 100, 50)
+        assert costs["total"] is not None, "expected known model pricing"
+        assert abs(costs["total"] - 0.004255) < 0.000001, f"unexpected cost: {costs}"
+
+        claude_usage.log_claude_usage(
+            report_type="pre-market",
+            model="claude-sonnet-5-5",
+            usage=FakeUsage(),
+            prompt_token_estimate=900,
+            response_chars=1200,
+            path=test_usage,
+        )
+        with open(test_usage, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 1, f"expected one usage row, got {len(rows)}"
+        assert rows[0]["model"] == "claude-sonnet-5-5", rows[0]
+        assert rows[0]["input_tokens"] == "1000", rows[0]
+        assert rows[0]["estimated_total_cost_usd"], rows[0]
+
+        if os.path.exists(test_usage):
+            os.remove(test_usage)
+
+        runner.record("test_claude_usage_cost_logging", True)
+    except Exception as e:
+        runner.record("test_claude_usage_cost_logging", False, str(e))
+
     # test_scorecard_old_outcome_schema_compat
     try:
         import signal_scorecard

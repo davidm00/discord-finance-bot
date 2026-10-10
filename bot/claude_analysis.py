@@ -7,7 +7,9 @@ from typing import Any
 
 from anthropic import Anthropic
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+from claude_usage import get_claude_model, log_claude_usage
+
+DEFAULT_MODEL = get_claude_model()
 
 THEMATIC_WATCHLIST = {
     "defense": ["LMT", "RTX", "NOC", "GD", "BA", "LDOS", "SAIC", "BAH", "HII", "TDG"],
@@ -385,15 +387,17 @@ def generate_analysis(
 
     full_prompt = "\n\n".join(sections + [analysis_instruction, source_weight_instruction, event_classification_instruction, ticker_instruction])
 
-    print(f"[claude] Prompt token estimate: ~{len(full_prompt) // 4} tokens")
-    print(f"[claude] Calling Claude API (model={DEFAULT_MODEL})...")
+    prompt_token_estimate = len(full_prompt) // 4
+    model = get_claude_model(DEFAULT_MODEL)
+    print(f"[claude] Prompt token estimate: ~{prompt_token_estimate} tokens")
+    print(f"[claude] Calling Claude API (model={model})...")
 
     try:
         client = Anthropic(api_key=api_key)
 
         print("[claude] Prompt caching enabled on system prompt")
         msg = client.messages.create(
-            model=DEFAULT_MODEL,
+            model=model,
             max_tokens=1500,
             system=[
                 {
@@ -405,11 +409,16 @@ def generate_analysis(
             messages=[{"role": "user", "content": full_prompt}],
         )
 
-        # Log cache usage if available
         usage = getattr(msg, "usage", None)
         if usage:
+            input_tokens = getattr(usage, "input_tokens", None)
+            output_tokens = getattr(usage, "output_tokens", None)
             cache_creation = getattr(usage, "cache_creation_input_tokens", None)
             cache_read = getattr(usage, "cache_read_input_tokens", None)
+            if input_tokens is not None:
+                print(f"[claude] input_tokens: {input_tokens}")
+            if output_tokens is not None:
+                print(f"[claude] output_tokens: {output_tokens}")
             if cache_creation is not None:
                 print(f"[claude] cache_creation_input_tokens: {cache_creation}")
             if cache_read is not None:
@@ -425,6 +434,15 @@ def generate_analysis(
             return "Analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
 
         print(f"[claude] Response received: {len(out)} chars")
+
+        if usage:
+            log_claude_usage(
+                report_type=report_type,
+                model=model,
+                usage=usage,
+                prompt_token_estimate=prompt_token_estimate,
+                response_chars=len(out),
+            )
 
         if DISCLAIMER_LINE not in out:
             out = out.rstrip() + "\n" + DISCLAIMER_LINE

@@ -27,6 +27,7 @@ from cache_manager import install_cache
 install_cache()
 
 from claude_analysis import DEFAULT_MODEL, DISCLAIMER_LINE
+from claude_usage import get_claude_model, log_claude_usage
 from history_fetcher import fetch_weekly_history
 from market_calendar import get_market_state
 from market_data import fetch_macro_context
@@ -737,7 +738,9 @@ def main() -> int:
         if len(macro_lines) > 1:
             user_prompt += "\n" + "\n".join(macro_lines)
 
-    print(f"[weekly] Prompt token estimate: ~{len(user_prompt)//4} tokens")
+    prompt_token_estimate = len(user_prompt) // 4
+    model = get_claude_model(DEFAULT_MODEL)
+    print(f"[weekly] Prompt token estimate: ~{prompt_token_estimate} tokens")
 
     analysis = ""
     recs = []
@@ -746,12 +749,12 @@ def main() -> int:
         analysis = "Weekly analysis unavailable at this time.\n\n" + DISCLAIMER_LINE
     else:
         try:
-            print("[weekly] Calling Claude API...")
+            print(f"[weekly] Calling Claude API (model={model})...")
             client = Anthropic(api_key=api_key)
 
             print("[claude] Prompt caching enabled on system prompt")
             msg = client.messages.create(
-                model=DEFAULT_MODEL,
+                model=model,
                 max_tokens=2000,
                 system=[
                     {
@@ -763,11 +766,16 @@ def main() -> int:
                 messages=[{"role": "user", "content": user_prompt}],
             )
 
-            # Log cache usage if available
             usage = getattr(msg, "usage", None)
             if usage:
+                input_tokens = getattr(usage, "input_tokens", None)
+                output_tokens = getattr(usage, "output_tokens", None)
                 cache_creation = getattr(usage, "cache_creation_input_tokens", None)
                 cache_read = getattr(usage, "cache_read_input_tokens", None)
+                if input_tokens is not None:
+                    print(f"[claude] input_tokens: {input_tokens}")
+                if output_tokens is not None:
+                    print(f"[claude] output_tokens: {output_tokens}")
                 if cache_creation is not None:
                     print(f"[claude] cache_creation_input_tokens: {cache_creation}")
                 if cache_read is not None:
@@ -785,6 +793,14 @@ def main() -> int:
             analysis = _ensure_scorecard_section(analysis, signal_scorecard)
 
             print(f"[weekly] Response received: {len(analysis)} chars")
+            if usage:
+                log_claude_usage(
+                    report_type="weekly",
+                    model=model,
+                    usage=usage,
+                    prompt_token_estimate=prompt_token_estimate,
+                    response_chars=len(analysis),
+                )
 
             # Parse tickers BEFORE truncation (truncation may cut the tickers section)
             print("[weekly] Parsing ticker recommendations...")

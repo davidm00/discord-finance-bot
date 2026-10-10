@@ -21,6 +21,10 @@ on:
         description: "If true, run the pipeline but do not send to Discord"
         required: false
         default: "false"
+      claude_model:
+        description: "Optional Claude model override for this run"
+        required: false
+        default: ""
 
 jobs:
   report:
@@ -109,6 +113,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -132,6 +137,7 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+          CLAUDE_MODEL: ${{ github.event.inputs.claude_model || '' }}
 
       - name: Save signal data cache
         if: steps.guard.outputs.should_run == 'true'
@@ -141,6 +147,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -152,6 +159,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           retention-days: 90
           if-no-files-found: warn
 
@@ -227,6 +235,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -250,6 +259,7 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+          CLAUDE_MODEL: ${{ github.event.inputs.claude_model || '' }}
 
       - name: Save signal data cache
         if: steps.guard.outputs.should_run == 'true'
@@ -259,6 +269,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -270,6 +281,7 @@ jobs:
             data/signals.csv
             data/signal_outcomes.csv
             data/signal_errors.csv
+            data/claude_usage.csv
           retention-days: 90
           if-no-files-found: warn
 
