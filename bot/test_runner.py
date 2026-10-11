@@ -1403,6 +1403,51 @@ Confidence: HIGH
     except Exception as e:
         runner.record("test_paper_portfolio_session_mapping", False, str(e))
 
+    # test_history_excludes_portfolio_messages
+    try:
+        import history_fetcher
+
+        def discord_message(title, description):
+            return {
+                "author": {"bot": True},
+                "webhook_id": "test",
+                "timestamp": "2026-10-10T20:00:00.000Z",
+                "embeds": [{"title": title, "description": description, "fields": []}],
+            }
+
+        mixed_messages = [
+            discord_message(
+                "TEST — WEEKLY — Paper Portfolio Performance — 2026-10-10 ET",
+                "Example portfolio message",
+            ),
+            discord_message(
+                "Paper Portfolio Performance — 2026-10-10 ET",
+                "Live portfolio message",
+            ),
+            discord_message(
+                "📊 Weekly Market Summary — Week of 2026-10-05 ET",
+                "Weekly summary",
+            ),
+            discord_message(
+                "📉 Post-Market Recap — 2026-10-10 ET | 🔴 Markets Closed",
+                "Valid post-market analysis",
+            ),
+            discord_message(
+                "📈 Pre-Market Briefing — 2026-10-10 ET | 🟡 Pre-Market",
+                "Valid pre-market analysis",
+            ),
+        ]
+        extracted = history_fetcher._extract_reports(mixed_messages, limit=10)
+        assert len(extracted) == 2, extracted
+        assert {row["report_type"] for row in extracted} == {"pre-market", "post-market"}, extracted
+        assert all("portfolio" not in row["analysis"].lower() for row in extracted), extracted
+        assert history_fetcher.DAILY_HISTORY_FETCH_LIMIT >= 25
+        assert history_fetcher.WEEKLY_HISTORY_FETCH_LIMIT >= 50
+
+        runner.record("test_history_excludes_portfolio_messages", True)
+    except Exception as e:
+        runner.record("test_history_excludes_portfolio_messages", False, str(e))
+
     # test_scorecard_old_outcome_schema_compat
     try:
         import signal_scorecard

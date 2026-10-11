@@ -165,7 +165,7 @@ DRY_RUN outputs to `local-output/latest_report.md` and `local-output/latest_clau
 ### Running Tests
 
 ```bash
-TEST_MOCK=1 python bot/test_runner.py    # Offline mock tests (24 tests)
+TEST_MOCK=1 python bot/test_runner.py    # Offline mock tests (25 tests)
 TEST_LIVE=1 python bot/test_runner.py    # Live API connectivity tests
 ```
 

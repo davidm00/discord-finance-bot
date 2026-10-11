@@ -9,6 +9,8 @@ import requests
 
 
 ET_TZ = pytz.timezone("America/New_York")
+DAILY_HISTORY_FETCH_LIMIT = 25
+WEEKLY_HISTORY_FETCH_LIMIT = 50
 
 
 def _to_dt(iso_ts: str) -> datetime | None:
@@ -27,6 +29,15 @@ def _to_et(iso_ts: str) -> str:
         return dt.astimezone(ET_TZ).strftime("%Y-%m-%d %H:%M ET")
     except Exception:
         return ""
+
+
+def _daily_report_type(title: str) -> str | None:
+    title_lower = str(title or "").strip().lower()
+    if "pre-market briefing" in title_lower:
+        return "pre-market"
+    if "post-market recap" in title_lower:
+        return "post-market"
+    return None
 
 
 def _extract_reports(messages: list[dict[str, Any]], limit: int, since_dt_utc: datetime | None = None) -> list[dict[str, Any]]:
@@ -58,13 +69,9 @@ def _extract_reports(messages: list[dict[str, Any]], limit: int, since_dt_utc: d
             desc = str(e0.get("description") or "").strip()
             ts_et = _to_et(ts_iso)
 
-            t_l = title.lower()
-            if "pre-market" in t_l:
-                rt = "pre-market"
-            elif "post-market" in t_l:
-                rt = "post-market"
-            else:
-                rt = "unknown"
+            rt = _daily_report_type(title)
+            if rt is None:
+                continue
 
             fields_dict: dict[str, str] = {}
             for f in (e0.get("fields") or []):
@@ -232,11 +239,14 @@ def fetch_previous_reports() -> list[dict[str, Any]]:
 
     url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
 
-    print(f"[history_fetcher] Fetching last 10 messages from channel {channel_id}...")
+    print(
+        f"[history_fetcher] Fetching last {DAILY_HISTORY_FETCH_LIMIT} messages "
+        f"from channel {channel_id}..."
+    )
     try:
         resp = requests.get(
             url,
-            params={"limit": 10},
+            params={"limit": DAILY_HISTORY_FETCH_LIMIT},
             headers={"Authorization": f"Bot {token}"},
             timeout=15,
         )
@@ -273,16 +283,15 @@ def fetch_previous_reports() -> list[dict[str, Any]]:
 
             e0 = embeds[0] or {}
             title = str(e0.get("title") or "").strip()
-            title_l = title.lower()
             ts_et = _to_et(str(m.get("timestamp") or ""))
 
             # Skip weekly summaries explicitly
-            if "weekly market summary" in title_l:
+            if "weekly market summary" in title.lower():
                 print(f"[history_fetcher] Skipping weekly summary message from {ts_et}")
                 continue
 
             # Only accept daily reports
-            if ("pre-market briefing" not in title_l) and ("post-market recap" not in title_l):
+            if _daily_report_type(title) is None:
                 continue
 
             bot_msgs.append(m)
@@ -310,12 +319,15 @@ def fetch_weekly_history() -> list[dict[str, Any]]:
 
     url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
 
-    print("[history_fetcher] fetch_weekly_history: fetching last 20 messages...")
+    print(
+        f"[history_fetcher] fetch_weekly_history: fetching last "
+        f"{WEEKLY_HISTORY_FETCH_LIMIT} messages..."
+    )
 
     try:
         resp = requests.get(
             url,
-            params={"limit": 20},
+            params={"limit": WEEKLY_HISTORY_FETCH_LIMIT},
             headers={"Authorization": f"Bot {token}"},
             timeout=15,
         )
@@ -350,8 +362,8 @@ def fetch_weekly_history() -> list[dict[str, Any]]:
                 continue
 
             # Only include daily reports; ignore weekly summaries or other embeds.
-            title = str((embeds[0] or {}).get("title") or "").lower()
-            if "pre-market" not in title and "post-market" not in title:
+            title = str((embeds[0] or {}).get("title") or "")
+            if _daily_report_type(title) is None:
                 continue
 
             # Apply 7-day cutoff
