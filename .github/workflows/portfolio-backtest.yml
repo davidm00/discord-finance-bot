@@ -1,0 +1,43 @@
+name: Paper Portfolio Backtest
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Restore latest signal data
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
+          key: portfolio-backtest-${{ github.run_id }}
+          restore-keys: signals-csv-
+
+      - name: Replay historical portfolio
+        run: python bot/paper_portfolio.py --backtest
+
+      - name: Upload backtest artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-portfolio-backtest-${{ github.run_number }}
+          path: data/paper_portfolio/backtest/
+          retention-days: 90
+          if-no-files-found: error

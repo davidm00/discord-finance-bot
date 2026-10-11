@@ -10,6 +10,7 @@ An AI-powered daily market intelligence bot that delivers pre-market briefings a
 - **Multi-Source Data** — Aggregates equities, crypto, news, political trades, government contracts, and earnings into a single briefing
 - **Source-Weighted News** — Headlines ranked by source reliability (Reuters > Bloomberg > CNBC > etc.) with event classification (geopolitical, earnings, M&A, regulatory, macro)
 - **Signal Tracking** — Logs every ticker recommendation to CSV with price-at-signal for historical backtesting
+- **Paper Portfolio** — Optional $10,000 simulated account that consumes the same logged recommendations without changing report generation
 
 ### 📈 What Each Report Contains
 
@@ -57,6 +58,10 @@ cron-job.org (free) → GitHub Actions workflow_dispatch
    Parse recommendations → Log signals
         │
    Discord webhook (2 embeds per report)
+        │
+   Optional paper portfolio step
+        │
+   Simulated ledger → separate portfolio card + 7-day chart
 ```
 
 ## Schedule
@@ -96,6 +101,43 @@ Configure in repo Settings → Secrets and variables → Actions:
 | `DISCORD_BOT_TOKEN` | Fetches previous reports for continuity |
 | `DISCORD_CHANNEL_ID` | Channel to read history from |
 
+### Paper Portfolio
+
+Paper trading is disabled by default. It uses the existing free yfinance data,
+GitHub Actions cache/artifacts, and Discord webhook; no brokerage account or
+additional paid API is required.
+
+Set the repository Actions variable `PAPER_TRADING_ENABLED=true` after completing
+a dry-run validation. A manual workflow run can override this with the
+`paper_trading_enabled` input.
+
+The version 1 policy is intentionally constrained:
+
+- starts a clean forward account with $10,000;
+- trades equities only; crypto remains in signal outcome tracking;
+- MEDIUM/HIGH BUY opens a 10% position, subject to a 60% gross exposure cap;
+- SELL exits an existing long; naked SELL calls do not open shorts;
+- HOLD/WATCH do not transact;
+- fills at the next eligible market open with 5 bps adverse slippage;
+- rejects fills more than 2% from the signal price;
+- applies a 4% stop and 10-trading-session safety exit;
+- suppresses repeated entries and never pyramids an open position.
+
+The post-market run sends a separate daily portfolio card. The weekly run sends
+a fuller card. Both show simulated account performance, cash, positions,
+purchase dates, fractional shares, and a trailing seven-day chart. The original
+market-report messages are not modified, and a portfolio failure cannot block
+an already-generated report.
+
+Useful manual workflows:
+
+- **Paper Portfolio Backtest** replays the May-present signal history into a
+  separate backtest account.
+- **Paper Portfolio Review** creates a recommend-only review artifact. It
+  requires at least 10 newly closed forward trades before suggesting strategy
+  changes and never modifies prompts or parameters itself. Trigger it every two
+  weeks through cron-job.org; low-activity runs explicitly defer changes.
+
 ### Local Development
 
 ```bash
@@ -123,8 +165,16 @@ DRY_RUN outputs to `local-output/latest_report.md` and `local-output/latest_clau
 ### Running Tests
 
 ```bash
-TEST_MOCK=1 python bot/test_runner.py    # Offline mock tests (15 tests)
+TEST_MOCK=1 python bot/test_runner.py    # Offline mock tests (24 tests)
 TEST_LIVE=1 python bot/test_runner.py    # Live API connectivity tests
+```
+
+Portfolio-only local previews can be generated without mutating forward state or
+posting to Discord:
+
+```bash
+PAPER_TRADING_ENABLED=true DRY_RUN=1 python bot/portfolio_job.py --report-type weekly
+python bot/paper_portfolio.py --backtest
 ```
 
 ## Security

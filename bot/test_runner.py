@@ -1189,6 +1189,220 @@ Confidence: HIGH
     except Exception as e:
         runner.record("test_claude_usage_cost_logging", False, str(e))
 
+    # test_paper_portfolio_execution
+    try:
+        from datetime import date
+        from pathlib import Path
+
+        import paper_portfolio
+        import portfolio_reporting
+        import portfolio_review
+
+        class FakePrices:
+            def __init__(self, values):
+                self.values = values
+
+            def history(self, ticker):
+                return self.values.get(ticker, {})
+
+            def bar(self, ticker, day):
+                return self.history(ticker).get(day)
+
+            def latest_bar(self, ticker, as_of):
+                rows = [(day, bar) for day, bar in self.history(ticker).items() if day <= as_of]
+                return max(rows, key=lambda item: item[0]) if rows else None
+
+        oct_5 = date(2026, 10, 5)
+        oct_6 = date(2026, 10, 6)
+        prices = FakePrices({
+            "SPY": {
+                oct_5: {"open": 600.0, "high": 604.0, "low": 598.0, "close": 603.0},
+                oct_6: {"open": 603.0, "high": 606.0, "low": 601.0, "close": 605.0},
+            },
+            "AAA": {
+                oct_5: {"open": 101.0, "high": 106.0, "low": 99.0, "close": 105.0},
+                oct_6: {"open": 104.0, "high": 107.0, "low": 103.0, "close": 106.0},
+            },
+            "GAP": {
+                oct_5: {"open": 110.0, "high": 112.0, "low": 109.0, "close": 111.0},
+            },
+            "STOP": {
+                oct_5: {"open": 100.0, "high": 101.0, "low": 94.0, "close": 95.0},
+            },
+        })
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            engine = paper_portfolio.PaperPortfolio(state_dir=state_dir, prices=prices)
+
+            buy = {
+                "date_et": "2026-10-05", "time_et": "08:01", "ticker": "AAA",
+                "action": "BUY", "confidence": "MEDIUM", "price_at_signal": "100.00",
+                "report_type": "pre-market",
+            }
+            hold = {
+                "date_et": "2026-10-05", "time_et": "08:02", "ticker": "AAA",
+                "action": "HOLD", "confidence": "MEDIUM", "price_at_signal": "100.00",
+                "report_type": "pre-market",
+            }
+            naked_sell = {
+                "date_et": "2026-10-05", "time_et": "08:03", "ticker": "ZZZ",
+                "action": "SELL", "confidence": "MEDIUM", "price_at_signal": "50.00",
+                "report_type": "pre-market",
+            }
+            low_confidence = {
+                "date_et": "2026-10-05", "time_et": "08:04", "ticker": "LOW",
+                "action": "BUY", "confidence": "LOW", "price_at_signal": "25.00",
+                "report_type": "pre-market",
+            }
+            crypto = {
+                "date_et": "2026-10-05", "time_et": "08:05", "ticker": "BTC",
+                "action": "BUY", "confidence": "HIGH", "price_at_signal": "80000.00",
+                "report_type": "pre-market",
+            }
+            gap = {
+                "date_et": "2026-10-05", "time_et": "08:06", "ticker": "GAP",
+                "action": "BUY", "confidence": "MEDIUM", "price_at_signal": "100.00",
+                "report_type": "pre-market",
+            }
+            stopped = {
+                "date_et": "2026-10-05", "time_et": "08:07", "ticker": "STOP",
+                "action": "BUY", "confidence": "HIGH", "price_at_signal": "100.00",
+                "report_type": "pre-market",
+            }
+            future = {
+                "date_et": "2026-10-06", "time_et": "08:01", "ticker": "FUTURE",
+                "action": "BUY", "confidence": "HIGH", "price_at_signal": "100.00",
+                "report_type": "pre-market",
+            }
+
+            result = engine.process(
+                [buy, hold, naked_sell, low_confidence, crypto, gap, stopped, future],
+                oct_5,
+            )
+            assert result["consumed"] == 7, result
+            state = engine.reconstruct()
+            assert "AAA" in state.positions, state.positions
+            assert "STOP" not in state.positions, "stop loss should close STOP"
+            assert state.cash >= 0, state.cash
+
+            orders = paper_portfolio._read_csv(engine.orders_path)
+            statuses = {(row["ticker"], row["action"]): (row["status"], row["reason"]) for row in orders}
+            assert statuses[("AAA", "HOLD")][0] == "ignored", statuses
+            assert statuses[("ZZZ", "SELL")][0] == "ignored", statuses
+            assert statuses[("LOW", "BUY")][0] == "rejected", statuses
+            assert statuses[("BTC", "BUY")][0] == "rejected", statuses
+            assert statuses[("GAP", "BUY")][0] == "rejected", statuses
+
+            ledger = paper_portfolio._read_csv(engine.ledger_path)
+            assert [row["event_type"] for row in ledger].count("BUY") == 2, ledger
+            assert [row["event_type"] for row in ledger].count("STOP") == 1, ledger
+
+            duplicate = engine.process(
+                [buy, hold, naked_sell, low_confidence, crypto, gap, stopped, future],
+                oct_5,
+            )
+            assert duplicate["consumed"] == 0, duplicate
+            assert len(paper_portfolio._read_csv(engine.ledger_path)) == len(ledger), "duplicate execution"
+
+            sell = {
+                "date_et": "2026-10-05", "time_et": "16:16", "ticker": "AAA",
+                "action": "SELL", "confidence": "MEDIUM", "price_at_signal": "105.00",
+                "report_type": "post-market",
+            }
+            engine.process([buy, sell], oct_5)
+            engine.process([buy, sell], oct_6)
+            state = engine.reconstruct()
+            assert not state.positions, state.positions
+            closed = portfolio_reporting._closed_trades(
+                paper_portfolio._read_csv(engine.ledger_path)
+            )
+            aaa_trade = next(trade for trade in closed if trade["ticker"] == "AAA")
+            assert aaa_trade["pnl"] > 0, aaa_trade
+
+            summary = portfolio_reporting.build_portfolio_summary(state_dir)
+            embed = portfolio_reporting.build_portfolio_embed(summary, "weekly", include_image=False)
+            assert "Paper Portfolio Performance" in embed["title"], embed
+            assert len(embed["fields"]) <= 25, embed
+            assert all(len(field["value"]) <= 1024 for field in embed["fields"]), embed
+            assert summary["closed_trades"] == 2, summary
+
+            chart_path = state_dir / "portfolio-7d.png"
+            generated = portfolio_reporting.generate_portfolio_chart(summary, chart_path)
+            assert generated == chart_path and chart_path.stat().st_size > 0, generated
+
+            review = portfolio_review.build_review(state_dir, minimum_new_closed_trades=10)
+            assert review["status"] == "insufficient-new-sample", review
+            assert review["approval_required"] is True, review
+            markdown_path, json_path = portfolio_review.write_review(review, state_dir)
+            assert markdown_path.is_file() and json_path.is_file(), (markdown_path, json_path)
+            checkpoints = paper_portfolio._read_csv(state_dir / "review_checkpoints.csv")
+            assert len(checkpoints) == 1, checkpoints
+
+        runner.record("test_paper_portfolio_execution", True)
+    except Exception as e:
+        runner.record("test_paper_portfolio_execution", False, str(e))
+
+    # test_paper_portfolio_session_mapping
+    try:
+        from datetime import date
+        from pathlib import Path
+
+        import paper_portfolio
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            engine = paper_portfolio.PaperPortfolio(state_dir=Path(temp_dir))
+            pre = {
+                "date_et": "2026-10-09", "time_et": "08:01",
+                "report_type": "pre-market",
+            }
+            post = {
+                "date_et": "2026-10-09", "time_et": "16:16",
+                "report_type": "post-market",
+            }
+            weekly = {
+                "date_et": "2026-10-10", "time_et": "08:01",
+                "report_type": "weekly",
+            }
+            assert engine.eligible_date(pre).isoformat() == "2026-10-09"
+            assert engine.eligible_date(post).isoformat() == "2026-10-12"
+            assert engine.eligible_date(weekly).isoformat() == "2026-10-12"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class EmptyPrices:
+                def history(self, ticker):
+                    return {}
+
+                def bar(self, ticker, day):
+                    return None
+
+                def latest_bar(self, ticker, as_of):
+                    return None
+
+            engine = paper_portfolio.PaperPortfolio(
+                state_dir=Path(temp_dir),
+                prices=EmptyPrices(),
+            )
+            buys = [
+                {
+                    "date_et": "2026-10-09", "time_et": f"16:{10 + index:02d}",
+                    "ticker": f"T{index}", "action": "BUY", "confidence": "MEDIUM",
+                    "price_at_signal": "100.00", "report_type": "post-market",
+                }
+                for index in range(7)
+            ]
+            engine.process(buys, date(2026, 10, 9))
+            orders = paper_portfolio._read_csv(engine.orders_path)
+            assert sum(row["status"] == "pending" for row in orders) == 6, orders
+            assert any(
+                row["status"] == "rejected" and "exposure" in row["reason"]
+                for row in orders
+            ), orders
+
+        runner.record("test_paper_portfolio_session_mapping", True)
+    except Exception as e:
+        runner.record("test_paper_portfolio_session_mapping", False, str(e))
+
     # test_scorecard_old_outcome_schema_compat
     try:
         import signal_scorecard

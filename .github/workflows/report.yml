@@ -29,6 +29,14 @@ on:
         description: "Claude effort level (low, medium, high, max)"
         required: false
         default: "low"
+      paper_trading_enabled:
+        description: "Optional paper portfolio override (true/false); otherwise uses repository variable"
+        required: false
+        default: ""
+
+concurrency:
+  group: finance-report-shared-state
+  cancel-in-progress: false
 
 jobs:
   report:
@@ -118,6 +126,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -144,8 +153,23 @@ jobs:
           CLAUDE_MODEL: ${{ github.event.inputs.claude_model || '' }}
           CLAUDE_EFFORT: ${{ github.event.inputs.claude_effort || 'low' }}
 
-      - name: Save signal data cache
+      - name: Process paper portfolio
+        id: paper_portfolio
         if: steps.guard.outputs.should_run == 'true'
+        continue-on-error: true
+        shell: bash
+        run: python bot/portfolio_job.py --report-type daily
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+          PAPER_TRADING_ENABLED: ${{ github.event.inputs.paper_trading_enabled || vars.PAPER_TRADING_ENABLED || 'false' }}
+
+      - name: Report paper portfolio failure
+        if: always() && steps.paper_portfolio.outcome == 'failure'
+        run: echo "::warning::Paper portfolio processing failed; the market report was delivered and portfolio state was preserved for diagnosis."
+
+      - name: Save signal data cache
+        if: always() && steps.guard.outputs.should_run == 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -153,6 +177,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -165,6 +190,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           retention-days: 90
           if-no-files-found: warn
 
@@ -241,6 +267,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
@@ -267,8 +294,23 @@ jobs:
           CLAUDE_MODEL: ${{ github.event.inputs.claude_model || '' }}
           CLAUDE_EFFORT: ${{ github.event.inputs.claude_effort || 'low' }}
 
-      - name: Save signal data cache
+      - name: Process paper portfolio
+        id: paper_portfolio
         if: steps.guard.outputs.should_run == 'true'
+        continue-on-error: true
+        shell: bash
+        run: python bot/portfolio_job.py --report-type weekly
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '' }}
+          PAPER_TRADING_ENABLED: ${{ github.event.inputs.paper_trading_enabled || vars.PAPER_TRADING_ENABLED || 'false' }}
+
+      - name: Report paper portfolio failure
+        if: always() && steps.paper_portfolio.outcome == 'failure'
+        run: echo "::warning::Paper portfolio processing failed; the weekly report was delivered and portfolio state was preserved for diagnosis."
+
+      - name: Save signal data cache
+        if: always() && steps.guard.outputs.should_run == 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -276,6 +318,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
@@ -288,6 +331,7 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
+            data/paper_portfolio/forward/
           retention-days: 90
           if-no-files-found: warn
 

@@ -8,3 +8,4 @@ lxml
 requests-cache
 tenacity
 exchange-calendars
+matplotlib

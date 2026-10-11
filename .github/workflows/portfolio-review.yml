@@ -1,0 +1,67 @@
+name: Paper Portfolio Review
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      minimum_new_trades:
+        description: "Minimum new closed trades required for strategy recommendations"
+        required: false
+        default: "10"
+
+concurrency:
+  group: finance-report-shared-state
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Restore portfolio state
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
+            data/signal_errors.csv
+            data/claude_usage.csv
+            data/paper_portfolio/forward/
+          key: signals-csv-portfolio-review-${{ github.run_id }}
+          restore-keys: signals-csv-
+
+      - name: Build recommend-only review
+        run: python bot/portfolio_review.py --minimum-new-trades "${{ github.event.inputs.minimum_new_trades || '10' }}"
+
+      - name: Save review checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/signals.csv
+            data/signal_outcomes.csv
+            data/signal_errors.csv
+            data/claude_usage.csv
+            data/paper_portfolio/forward/
+          key: signals-csv-portfolio-review-${{ github.run_id }}
+
+      - name: Upload review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-portfolio-review-${{ github.run_number }}
+          path: data/paper_portfolio/forward/reviews/
+          retention-days: 90
+          if-no-files-found: error
