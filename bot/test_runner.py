@@ -1393,7 +1393,7 @@ Confidence: HIGH
             ]
             engine.process(buys, date(2026, 10, 9))
             orders = paper_portfolio._read_csv(engine.orders_path)
-            assert sum(row["status"] == "pending" for row in orders) == 6, orders
+            assert sum(row["status"] == "pending" for row in orders) == 4, orders
             assert any(
                 row["status"] == "rejected" and "exposure" in row["reason"]
                 for row in orders

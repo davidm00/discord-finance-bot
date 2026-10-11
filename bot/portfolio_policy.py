@@ -7,10 +7,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PortfolioPolicy:
-    version: str = "v1"
+    version: str = "v2-aggressive"
     initial_capital: float = 10_000.0
-    position_allocation_pct: float = 0.10
-    max_gross_exposure_pct: float = 0.60
+    position_allocation_pct: float = 0.20
+    max_gross_exposure_pct: float = 0.80
     max_open_gap_pct: float = 0.02
     stop_loss_pct: float = 0.04
     max_holding_sessions: int = 10

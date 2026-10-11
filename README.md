@@ -115,7 +115,7 @@ The version 1 policy is intentionally constrained:
 
 - starts a clean forward account with $10,000;
 - trades equities only; crypto remains in signal outcome tracking;
-- MEDIUM/HIGH BUY opens a 10% position, subject to a 60% gross exposure cap;
+- MEDIUM/HIGH BUY opens a 20% position, subject to an 80% gross exposure cap;
 - SELL exits an existing long; naked SELL calls do not open shorts;
 - HOLD/WATCH do not transact;
 - fills at the next eligible market open with 5 bps adverse slippage;
