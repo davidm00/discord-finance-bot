@@ -176,7 +176,7 @@ jobs:
         run: echo "::warning::Paper portfolio processing failed; the market report was delivered and portfolio state was preserved for diagnosis."
 
       - name: Save signal data cache
-        if: always() && steps.guard.outputs.should_run == 'true'
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -330,7 +330,7 @@ jobs:
         run: echo "::warning::Paper portfolio processing failed; the weekly report was delivered and portfolio state was preserved for diagnosis."
 
       - name: Save signal data cache
-        if: always() && steps.guard.outputs.should_run == 'true'
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
