@@ -30,17 +30,6 @@ jobs:
       - name: Install dependencies
         run: pip install --disable-pip-version-check -r requirements.txt
 
-      - name: Restore portfolio state
-        uses: actions/cache@v4
-        with:
-          path: |
-            data/signals.csv
-            data/signal_outcomes.csv
-            data/signal_errors.csv
-            data/claude_usage.csv
-          key: signals-csv-portfolio-review-${{ github.run_id }}
-          restore-keys: signals-csv-
-
       - name: Restore portfolio account
         uses: actions/cache@v4
         with:
