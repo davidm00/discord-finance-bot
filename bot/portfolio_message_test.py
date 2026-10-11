@@ -40,7 +40,11 @@ def build_sample_summary() -> dict:
         "market_value": 4_056.40,
         "all_time_pnl": 146.80,
         "all_time_return_pct": 1.47,
+        "weekly_pnl": 146.80,
         "weekly_return_pct": 1.47,
+        "weekly_realized_pnl": 61.25,
+        "weekly_opened": 2,
+        "weekly_closed": 3,
         "realized_pnl": 61.25,
         "unrealized_pnl": 85.55,
         "max_drawdown_pct": -0.44,
@@ -66,8 +70,8 @@ def build_sample_summary() -> dict:
         ],
         "pending_orders": [
             {
-                "ticker": "DAL",
-                "side": "SELL",
+                "ticker": "CVX",
+                "side": "BUY",
                 "eligible_date": (today + timedelta(days=2)).isoformat(),
             }
         ],
@@ -111,9 +115,9 @@ def main() -> int:
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 
     payloads = []
-    for report_type, label in (("daily", "DAILY"), ("weekly", "WEEKLY")):
+    for report_type in ("daily", "weekly"):
         embed = build_portfolio_embed(summary, report_type, include_image=chart is not None)
-        embed["title"] = f"TEST — {label} — {embed['title']}"
+        embed["title"] = f"TEST — {embed['title']}"
         embed["description"] = (
             "Example message using hypothetical data. The live forward account was not changed.\n"
             + embed["description"]

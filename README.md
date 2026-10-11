@@ -127,7 +127,9 @@ The post-market run sends a separate daily portfolio card. The weekly run sends
 a fuller card. Both show simulated account performance, cash, positions,
 purchase dates, fractional shares, and a trailing seven-day chart. The original
 market-report messages are not modified, and a portfolio failure cannot block
-an already-generated report.
+an already-generated report. Forward state is persisted in a dedicated cache
+and a 90-day artifact; the workflow restores the artifact if the cache is
+missing.
 
 Useful manual workflows:
 

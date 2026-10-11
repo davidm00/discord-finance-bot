@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import math
-import os
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import pytz
 import requests
 
 from paper_portfolio import (
     DEFAULT_STATE_DIR,
-    ET,
-    LEDGER_HEADERS,
-    ORDER_HEADERS,
-    SNAPSHOT_HEADERS,
     _read_csv,
     _safe_float,
 )
@@ -86,6 +79,19 @@ def build_portfolio_summary(state_dir: Path = DEFAULT_STATE_DIR) -> dict[str, An
     week_base = week_candidates[-1] if week_candidates else snapshots[0]
     week_equity = _safe_float(week_base.get("equity")) or DEFAULT_POLICY.initial_capital
     weekly_return = ((equity / week_equity) - 1) * 100 if week_equity else 0.0
+    weekly_pnl = equity - week_equity
+    weekly_closed_trades = [
+        trade
+        for trade in closed
+        if datetime.strptime(trade["closed_at"][:10], "%Y-%m-%d").date() >= week_cutoff
+    ]
+    weekly_realized_pnl = sum(trade["pnl"] for trade in weekly_closed_trades)
+    weekly_opened = sum(
+        1
+        for event in ledger
+        if event.get("event_type") == "BUY"
+        and datetime.strptime(event.get("occurred_at_et", "")[:10], "%Y-%m-%d").date() >= week_cutoff
+    )
 
     equities = [_safe_float(row.get("equity")) for row in snapshots]
     peak = -math.inf
@@ -110,7 +116,11 @@ def build_portfolio_summary(state_dir: Path = DEFAULT_STATE_DIR) -> dict[str, An
         "market_value": _safe_float(latest.get("market_value")) or 0.0,
         "all_time_pnl": equity - DEFAULT_POLICY.initial_capital,
         "all_time_return_pct": return_pct,
+        "weekly_pnl": weekly_pnl,
         "weekly_return_pct": weekly_return,
+        "weekly_realized_pnl": weekly_realized_pnl,
+        "weekly_opened": weekly_opened,
+        "weekly_closed": len(weekly_closed_trades),
         "realized_pnl": _safe_float(latest.get("realized_pnl")) or 0.0,
         "unrealized_pnl": _safe_float(latest.get("unrealized_pnl")) or 0.0,
         "max_drawdown_pct": max_drawdown,
@@ -193,17 +203,27 @@ def _clamp(value: str, limit: int) -> str:
     return value if len(value) <= limit else value[: limit - 1].rstrip() + "…"
 
 
+def _display_date(value: str) -> str:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%b %d").replace(" 0", " ")
+    except ValueError:
+        return value
+
+
 def build_portfolio_embed(summary: dict[str, Any], report_type: str, include_image: bool) -> dict[str, Any]:
     positions = summary["positions"]
     if positions:
-        position_lines = [
-            (
+        position_lines = []
+        for position in positions[:10]:
+            cost_basis = position["shares"] * position["average_entry"]
+            dollar_pnl = position["market_value"] - cost_basis
+            position_lines.append(
                 f"**{position['ticker']}** — {position['shares']:.4f} shares | "
-                f"bought {position['purchase_date']} @ ${position['average_entry']:,.2f} | "
-                f"${position['current_price']:,.2f} ({position['pnl_pct']:+.2f}%)"
+                f"value ${position['market_value']:,.2f} | "
+                f"P&L {_signed_money(dollar_pnl)} ({position['pnl_pct']:+.2f}%)\n"
+                f"Bought {_display_date(position['purchase_date'])} @ "
+                f"${position['average_entry']:,.2f} | now ${position['current_price']:,.2f}"
             )
-            for position in positions[:10]
-        ]
         if len(positions) > 10:
             position_lines.append(f"+{len(positions) - 10} more positions")
         position_text = "\n".join(position_lines)
@@ -224,29 +244,57 @@ def build_portfolio_embed(summary: dict[str, Any], report_type: str, include_ima
         if summary["closed_win_rate"] is not None
         else "n/a"
     )
-    fields = [
-        {
-            "name": "Account",
+    account_field = {
+        "name": "Account",
+        "value": (
+            f"Equity: **${summary['equity']:,.2f}**\n"
+            f"All time: **{_signed_money(summary['all_time_pnl'])} "
+            f"({_signed_pct(summary['all_time_return_pct'])})**\n"
+            f"Cash: ${summary['cash']:,.2f} | Invested: ${summary['market_value']:,.2f}"
+        ),
+        "inline": True,
+    }
+    if report_type == "weekly":
+        result_field = {
+            "name": "This Week",
             "value": (
-                f"Equity: **${summary['equity']:,.2f}**\n"
-                f"All time: **{_signed_money(summary['all_time_pnl'])} "
-                f"({_signed_pct(summary['all_time_return_pct'])})**\n"
-                f"Cash: ${summary['cash']:,.2f} | Invested: ${summary['market_value']:,.2f}"
+                f"P&L: **{_signed_money(summary['weekly_pnl'])} "
+                f"({_signed_pct(summary['weekly_return_pct'])})**\n"
+                f"Opened: {summary['weekly_opened']} | Closed: {summary['weekly_closed']}\n"
+                f"Realized: {_signed_money(summary['weekly_realized_pnl'])}"
             ),
             "inline": True,
-        },
-        {
+        }
+        track_record_field = {
+            "name": "Track Record",
+            "value": (
+                f"Max drawdown (all time): {summary['max_drawdown_pct']:.2f}%\n"
+                f"Closed trades: {summary['closed_trades']} | Win rate: {win_rate}"
+            ),
+            "inline": False,
+        }
+    else:
+        result_field = {
             "name": "Risk & Results",
             "value": (
                 f"7D: **{_signed_pct(summary['weekly_return_pct'])}**\n"
-                f"Max drawdown: {summary['max_drawdown_pct']:.2f}%\n"
+                f"Max drawdown (all time): {summary['max_drawdown_pct']:.2f}%\n"
                 f"Closed trades: {summary['closed_trades']} | Win rate: {win_rate}"
             ),
             "inline": True,
-        },
+        }
+        track_record_field = None
+
+    fields = [
+        account_field,
+        result_field,
+    ]
+    if track_record_field:
+        fields.append(track_record_field)
+    fields.extend([
         {"name": "Open Positions", "value": _clamp(position_text, 1024), "inline": False},
         {"name": "Pending Orders", "value": _clamp(pending_text, 1024), "inline": False},
-    ]
+    ])
     if report_type == "weekly" and summary["recent_orders"]:
         activity = "\n".join(
             f"{row['ticker']} {row['action']} — {row['status']}: {row['reason']}"
@@ -255,7 +303,10 @@ def build_portfolio_embed(summary: dict[str, Any], report_type: str, include_ima
         fields.append({"name": "Recent Activity", "value": _clamp(activity, 1024), "inline": False})
 
     embed: dict[str, Any] = {
-        "title": f"Paper Portfolio Performance — {summary['as_of']} ET",
+        "title": (
+            f"Paper Portfolio — {report_type.title()} | "
+            f"{_display_date(summary['as_of'])} ET"
+        ),
         "description": PORTFOLIO_DISCLAIMER,
         "color": 3066993 if summary["all_time_pnl"] >= 0 else 15158332,
         "fields": fields[:25],

@@ -11,6 +11,10 @@ on:
         required: false
         default: "10"
 
+permissions:
+  actions: read
+  contents: read
+
 concurrency:
   group: finance-report-shared-state
   cancel-in-progress: false
@@ -31,11 +35,16 @@ jobs:
         run: pip install --disable-pip-version-check -r requirements.txt
 
       - name: Restore portfolio account
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-review-${{ github.run_id }}
           restore-keys: paper-portfolio-
+
+      - name: Recover portfolio artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_portfolio_artifact.sh
 
       - name: Build recommend-only review
         run: python bot/portfolio_review.py --minimum-new-trades "${{ github.event.inputs.minimum_new_trades || '10' }}"

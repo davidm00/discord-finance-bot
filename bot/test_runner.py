@@ -1322,10 +1322,15 @@ Confidence: HIGH
 
             summary = portfolio_reporting.build_portfolio_summary(state_dir)
             embed = portfolio_reporting.build_portfolio_embed(summary, "weekly", include_image=False)
-            assert "Paper Portfolio Performance" in embed["title"], embed
+            assert embed["title"].startswith("Paper Portfolio — Weekly |"), embed
             assert len(embed["fields"]) <= 25, embed
             assert all(len(field["value"]) <= 1024 for field in embed["fields"]), embed
             assert summary["closed_trades"] == 2, summary
+            assert summary["weekly_closed"] == 2, summary
+            field_names = [field["name"] for field in embed["fields"]]
+            assert "This Week" in field_names and "Track Record" in field_names, field_names
+            positions_field = next(field for field in embed["fields"] if field["name"] == "Open Positions")
+            assert "No open positions." in positions_field["value"], positions_field
 
             chart_path = state_dir / "portfolio-7d.png"
             generated = portfolio_reporting.generate_portfolio_chart(summary, chart_path)

@@ -123,7 +123,7 @@ jobs:
 
       - name: Restore signal data cache
         if: steps.guard.outputs.should_run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             data/signals.csv
@@ -142,11 +142,18 @@ jobs:
 
       - name: Restore paper portfolio state
         if: steps.guard.outputs.should_run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-${{ github.run_id }}
           restore-keys: paper-portfolio-
+
+      - name: Recover paper portfolio artifact
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_portfolio_artifact.sh
 
       - name: Run report
         if: steps.guard.outputs.should_run == 'true'
@@ -218,6 +225,15 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
+      - name: Upload paper portfolio state
+        uses: actions/upload-artifact@v4
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        with:
+          name: paper-portfolio-state-${{ github.run_number }}
+          path: data/paper_portfolio/forward/
+          retention-days: 90
+          if-no-files-found: error
+
       - name: Upload dry-run preview
         uses: actions/upload-artifact@v4
         if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') == 'true'
@@ -284,7 +300,7 @@ jobs:
 
       - name: Restore signal data cache
         if: steps.guard.outputs.should_run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             data/signals.csv
@@ -303,11 +319,18 @@ jobs:
 
       - name: Restore paper portfolio state
         if: steps.guard.outputs.should_run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-${{ github.run_id }}
           restore-keys: paper-portfolio-
+
+      - name: Recover paper portfolio artifact
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_portfolio_artifact.sh
 
       - name: Run weekly report
         if: steps.guard.outputs.should_run == 'true'
@@ -378,6 +401,15 @@ jobs:
             data/paper_portfolio/forward/
           retention-days: 90
           if-no-files-found: warn
+
+      - name: Upload paper portfolio state
+        uses: actions/upload-artifact@v4
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        with:
+          name: paper-portfolio-state-weekly-${{ github.run_number }}
+          path: data/paper_portfolio/forward/
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Upload dry-run preview
         uses: actions/upload-artifact@v4
