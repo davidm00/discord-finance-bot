@@ -129,7 +129,9 @@ purchase dates, fractional shares, and a trailing seven-day chart. The original
 market-report messages are not modified, and a portfolio failure cannot block
 an already-generated report. Forward state is persisted in a dedicated cache
 and a 90-day artifact; the workflow restores the artifact if the cache is
-missing.
+missing. Successful production runs also commit signal and portfolio data to
+the dedicated `data-backups` branch, providing permanent Git history without
+adding generated-data commits to `main`.
 
 Useful manual workflows:
 
@@ -139,6 +141,8 @@ Useful manual workflows:
   requires at least 10 newly closed forward trades before suggesting strategy
   changes and never modifies prompts or parameters itself. Trigger it every two
   weeks through cron-job.org; low-activity runs explicitly defer changes.
+- **Durable Finance Data Backup** initializes or manually refreshes the
+  `data-backups` branch from the latest production artifacts and account state.
 
 ### Local Development
 

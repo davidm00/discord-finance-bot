@@ -1,0 +1,50 @@
+name: Durable Finance Data Backup
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: finance-report-shared-state
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download latest signal artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_signal_artifact.sh
+
+      - name: Restore portfolio cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-backup-${{ github.run_id }}
+          restore-keys: paper-portfolio-
+
+      - name: Recover portfolio artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_portfolio_artifact.sh
+
+      - name: Recover existing durable branch
+        run: bash scripts/restore_data_branch.sh
+
+      - name: Verify signal history
+        run: test -s data/signals.csv
+
+      - name: Commit durable backup
+        run: bash scripts/backup_data_branch.sh

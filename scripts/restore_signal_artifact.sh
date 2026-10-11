@@ -46,6 +46,5 @@ done < <(
 )
 
 if [ "$found" != "true" ]; then
-  echo "No non-empty signal artifact was found in the latest 50 successful report runs." >&2
-  exit 1
+  echo "No non-empty signal artifact was found; durable branch fallback will be attempted."
 fi

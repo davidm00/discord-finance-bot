@@ -36,7 +36,7 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
 
 concurrency:
   group: finance-report-shared-state
@@ -155,7 +155,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/restore_portfolio_artifact.sh
 
+      - name: Recover durable data branch
+        if: steps.guard.outputs.should_run == 'true'
+        run: bash scripts/restore_data_branch.sh
+
+      - name: Verify signal history
+        if: steps.guard.outputs.should_run == 'true'
+        run: test -s data/signals.csv
+
       - name: Run report
+        id: daily_report
         if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
@@ -210,6 +219,10 @@ jobs:
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-${{ github.run_id }}
+
+      - name: Back up durable finance data
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.daily_report.outcome == 'success'
+        run: bash scripts/backup_data_branch.sh
 
       - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4
@@ -332,7 +345,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/restore_portfolio_artifact.sh
 
+      - name: Recover durable data branch
+        if: steps.guard.outputs.should_run == 'true'
+        run: bash scripts/restore_data_branch.sh
+
+      - name: Verify signal history
+        if: steps.guard.outputs.should_run == 'true'
+        run: test -s data/signals.csv
+
       - name: Run weekly report
+        id: weekly_report_run
         if: steps.guard.outputs.should_run == 'true'
         shell: bash
         run: |
@@ -387,6 +409,10 @@ jobs:
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-${{ github.run_id }}
+
+      - name: Back up durable finance data
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.weekly_report_run.outcome == 'success'
+        run: bash scripts/backup_data_branch.sh
 
       - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4

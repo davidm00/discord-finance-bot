@@ -13,7 +13,7 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
 
 concurrency:
   group: finance-report-shared-state
@@ -46,7 +46,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/restore_portfolio_artifact.sh
 
+      - name: Recover durable data branch
+        run: bash scripts/restore_data_branch.sh
+
       - name: Build recommend-only review
+        id: build_review
         run: python bot/portfolio_review.py --minimum-new-trades "${{ github.event.inputs.minimum_new_trades || '10' }}"
 
       - name: Save review checkpoint
@@ -55,6 +59,10 @@ jobs:
         with:
           path: data/paper_portfolio/forward/
           key: paper-portfolio-review-${{ github.run_id }}
+
+      - name: Back up review checkpoint
+        if: always() && steps.build_review.outcome == 'success'
+        run: bash scripts/backup_data_branch.sh
 
       - name: Upload review
         if: always()
