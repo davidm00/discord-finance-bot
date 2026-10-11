@@ -27,6 +27,8 @@ jobs:
           path: |
             data/signals.csv
             data/signal_outcomes.csv
+            data/signal_errors.csv
+            data/claude_usage.csv
           key: portfolio-backtest-${{ github.run_id }}
           restore-keys: signals-csv-
 

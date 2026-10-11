@@ -38,9 +38,15 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
-            data/paper_portfolio/forward/
           key: signals-csv-portfolio-review-${{ github.run_id }}
           restore-keys: signals-csv-
+
+      - name: Restore portfolio account
+        uses: actions/cache@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-review-${{ github.run_id }}
+          restore-keys: paper-portfolio-
 
       - name: Build recommend-only review
         run: python bot/portfolio_review.py --minimum-new-trades "${{ github.event.inputs.minimum_new_trades || '10' }}"
@@ -49,13 +55,8 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: |
-            data/signals.csv
-            data/signal_outcomes.csv
-            data/signal_errors.csv
-            data/claude_usage.csv
-            data/paper_portfolio/forward/
-          key: signals-csv-portfolio-review-${{ github.run_id }}
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-review-${{ github.run_id }}
 
       - name: Upload review
         if: always()

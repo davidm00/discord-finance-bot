@@ -126,9 +126,16 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
-            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
+
+      - name: Restore paper portfolio state
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-${{ github.run_id }}
+          restore-keys: paper-portfolio-
 
       - name: Run report
         if: steps.guard.outputs.should_run == 'true'
@@ -177,8 +184,14 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
-            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
+
+      - name: Save paper portfolio state
+        if: always() && steps.guard.outputs.should_run == 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        uses: actions/cache/save@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4
@@ -267,9 +280,16 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
-            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
+
+      - name: Restore paper portfolio state
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-${{ github.run_id }}
+          restore-keys: paper-portfolio-
 
       - name: Run weekly report
         if: steps.guard.outputs.should_run == 'true'
@@ -318,8 +338,14 @@ jobs:
             data/signal_outcomes.csv
             data/signal_errors.csv
             data/claude_usage.csv
-            data/paper_portfolio/forward/
           key: signals-csv-${{ github.run_id }}
+
+      - name: Save paper portfolio state
+        if: always() && steps.guard.outputs.should_run == 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        uses: actions/cache/save@v4
+        with:
+          path: data/paper_portfolio/forward/
+          key: paper-portfolio-${{ github.run_id }}
 
       - name: Upload signal CSVs as artifact
         uses: actions/upload-artifact@v4
