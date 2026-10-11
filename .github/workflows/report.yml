@@ -34,6 +34,10 @@ on:
         required: false
         default: ""
 
+permissions:
+  actions: read
+  contents: read
+
 concurrency:
   group: finance-report-shared-state
   cancel-in-progress: false
@@ -129,6 +133,13 @@ jobs:
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
+      - name: Ensure signal history is restored
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_signal_artifact.sh
+
       - name: Restore paper portfolio state
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache@v4
@@ -187,7 +198,7 @@ jobs:
           key: signals-csv-${{ github.run_id }}
 
       - name: Save paper portfolio state
-        if: always() && steps.guard.outputs.should_run == 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
         uses: actions/cache/save@v4
         with:
           path: data/paper_portfolio/forward/
@@ -283,6 +294,13 @@ jobs:
           key: signals-csv-${{ github.run_id }}
           restore-keys: signals-csv-
 
+      - name: Ensure signal history is restored
+        if: steps.guard.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/restore_signal_artifact.sh
+
       - name: Restore paper portfolio state
         if: steps.guard.outputs.should_run == 'true'
         uses: actions/cache@v4
@@ -341,7 +359,7 @@ jobs:
           key: signals-csv-${{ github.run_id }}
 
       - name: Save paper portfolio state
-        if: always() && steps.guard.outputs.should_run == 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
+        if: always() && steps.guard.outputs.should_run == 'true' && (github.event.inputs.dry_run || '') != 'true' && steps.paper_portfolio.outcome == 'success' && (github.event.inputs.paper_trading_enabled == 'true' || vars.PAPER_TRADING_ENABLED == 'true')
         uses: actions/cache/save@v4
         with:
           path: data/paper_portfolio/forward/

@@ -26,46 +26,9 @@ jobs:
         run: pip install --disable-pip-version-check -r requirements.txt
 
       - name: Download latest non-empty signal artifact
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          target=/tmp/latest-signals
-          found=false
-
-          while read -r run_id run_number; do
-            artifact_name=$(gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" \
-              --jq '[.artifacts[] | select(.expired == false and (.name | startswith("signals-csv")) and .size_in_bytes > 10000)][0].name // empty')
-
-            if [ -z "$artifact_name" ]; then
-              continue
-            fi
-
-            rm -rf /tmp/latest-signals
-            mkdir -p "$target"
-            gh run download "$run_id" --name "$artifact_name" --dir "$target"
-            if [ -s "$target/signals.csv" ]; then
-              mkdir -p data
-              cp "$target/signals.csv" data/signals.csv
-              if [ -s "$target/signal_outcomes.csv" ]; then
-                cp "$target/signal_outcomes.csv" data/signal_outcomes.csv
-              fi
-              echo "Using $artifact_name from workflow run $run_id (run number $run_number)"
-              found=true
-              break
-            fi
-          done < <(
-            gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/workflows/report.yml/runs?status=success&branch=main&per_page=50" \
-              --jq '.workflow_runs[] | "\(.id) \(.run_number)"'
-          )
-
-          if [ "$found" != "true" ]; then
-            echo "No non-empty signal artifact was found in the latest 50 successful report runs." >&2
-            exit 1
-          fi
+        run: bash scripts/restore_signal_artifact.sh
 
       - name: Replay historical portfolio
         run: python bot/paper_portfolio.py --backtest
