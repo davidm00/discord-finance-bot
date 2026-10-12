@@ -1,3 +1,6 @@
 order_id,signal_id,submitted_at_et,eligible_date,ticker,side,action,confidence,report_type,signal_price,target_notional,status,filled_at_et,fill_price,shares,reason,policy_version
-ord_eea0554951fd3ea8,f3d175f13be1eca1,2026-10-12 08:01 ET,2026-10-12,XOM,BUY,BUY,MEDIUM,pre-market,168.94,2000.00,pending,,,,eligible recommendation,v2-aggressive
+ord_eea0554951fd3ea8,f3d175f13be1eca1,2026-10-12 08:01 ET,2026-10-12,XOM,BUY,BUY,MEDIUM,pre-market,168.94,2000.00,filled,2026-10-12 09:30 ET,171.0955,11.689378,eligible recommendation,v2-aggressive
 ord_38566cc5a28aada6,b0859cce7d295977,2026-10-12 08:01 ET,,GS,,WATCH,MEDIUM,pre-market,895.32,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_b77a40890e921b5b,c0e5e081b62cd4a4,2026-10-12 16:16 ET,2026-10-13,GS,BUY,BUY,MEDIUM,post-market,893.95,2002.44,pending,,,,eligible recommendation,v2-aggressive
+ord_1a9b8fe06146dcf1,7146d7bf9ee85a25,2026-10-12 16:16 ET,,XOM,,BUY,MEDIUM,post-market,172.15,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_592101f5cb46a677,46cb9726388dcace,2026-10-12 16:16 ET,,QQQ,,WATCH,LOW,post-market,746.04,0.00,ignored,,,,WATCH does not transact,v2-aggressive

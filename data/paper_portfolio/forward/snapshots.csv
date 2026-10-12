@@ -1,2 +1,2 @@
 date_et,recorded_at_et,cash,market_value,equity,realized_pnl,unrealized_pnl,return_pct,spy_return_pct,positions_json,policy_version
-2026-10-12,2026-10-12 08:01 ET,10000.00,0.00,10000.00,0.00,0.00,0.00,,[],v2-aggressive
+2026-10-12,2026-10-12 16:16 ET,8000.00,2012.21,10012.21,0.00,12.21,0.12,0.00,"[{""ticker"":""XOM"",""purchase_date"":""2026-10-12"",""shares"":11.689378,""average_entry"":171.0955,""current_price"":172.14,""market_value"":2012.21,""pnl_pct"":0.61}]",v2-aggressive
