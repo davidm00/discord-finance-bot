@@ -1,4 +1,4 @@
 date_et,time_et,run_id,report_type,dry_run,model,prompt_token_estimate,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,response_chars,estimated_input_cost_usd,estimated_cache_write_cost_usd,estimated_cache_read_cost_usd,estimated_output_cost_usd,estimated_total_cost_usd
 2026-10-10,20:45,38099424622,weekly,True,claude-sonnet-4-6,9612,11092,1874,0,0,6927,0.03327600,0.00000000,0.00000000,0.02811000,0.06138600
 2026-10-10,20:47,38099583451,weekly,True,claude-sonnet-4-6,10075,11826,1747,0,0,6565,0.03547800,0.00000000,0.00000000,0.02620500,0.06168300
-2026-10-10,21:13,38101012610,weekly,True,claude-sonnet-4-6,11026,12920,1733,0,0,6486,0.03876000,0.00000000,0.00000000,0.02599500,0.06475500
+2026-10-12,08:01,38246269354,pre-market,False,claude-sonnet-4-6,2839,4066,1107,0,0,3967,0.01219800,0.00000000,0.00000000,0.01660500,0.02880300
