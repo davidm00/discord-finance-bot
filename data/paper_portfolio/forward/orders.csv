@@ -22,3 +22,6 @@ ord_d68b8e8da5566c34,9cbc67859f972c08,2026-10-15 08:01 ET,,QQQ,,WATCH,MEDIUM,pre
 ord_14b0ca521d8000c1,1cdf48336fb7683e,2026-10-15 16:16 ET,,TRV,,WATCH,MEDIUM,post-market,383.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_418102117932e53a,f6f9494e6c3c6e3a,2026-10-15 16:16 ET,,XOM,,BUY,MEDIUM,post-market,174.68,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_7e0c9105ef070f5f,da622690045f0f93,2026-10-15 16:16 ET,,QQQ,,WATCH,MEDIUM,post-market,728.00,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_3313b686f7fb1c38,ee9599acc516b583,2026-10-16 08:01 ET,,TRV,,WATCH,MEDIUM,pre-market,383.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_05e02334b7b629ad,7658ec213f3ae3bb,2026-10-16 08:01 ET,,QQQ,,WATCH,MEDIUM,pre-market,728.00,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_07b4769f653d934f,5f0518a216843068,2026-10-16 08:01 ET,,XOM,,HOLD,MEDIUM,pre-market,174.68,0.00,ignored,,,,HOLD does not transact,v2-aggressive
