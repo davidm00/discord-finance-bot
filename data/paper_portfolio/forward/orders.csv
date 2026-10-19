@@ -31,6 +31,9 @@ ord_e9e3cd7584f0f9dd,0dbe987d726752de,2026-10-16 16:16 ET,,GE,,WATCH,MEDIUM,post
 ord_f4840abb39b23def,24adc2af4fbc8a00,2026-10-17 08:01 ET,,XOM,,BUY,MEDIUM,weekly,178.98,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_8063b0a29fc6cbc8,de36ce004dcbe0ce,2026-10-17 08:01 ET,,QQQ,,WATCH,LOW,weekly,709.80,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_d62e39215fe42a67,a9fa30a6b9dd99f6,2026-10-17 08:01 ET,,GE,,WATCH,MEDIUM,weekly,313.83,0.00,ignored,,,,WATCH does not transact,v2-aggressive
-ord_07bb3dd718710939,8755c4d5a54a4f3f,2026-10-19 08:01 ET,2026-10-19,NOC,BUY,BUY,MEDIUM,pre-market,519.86,2018.43,pending,,,,eligible recommendation,v2-aggressive
+ord_07bb3dd718710939,8755c4d5a54a4f3f,2026-10-19 08:01 ET,2026-10-19,NOC,BUY,BUY,MEDIUM,pre-market,519.86,2018.43,filled,2026-10-19 09:30 ET,511.2555,3.947986,eligible recommendation,v2-aggressive
 ord_b04d644333a3bdff,1c1a00f5393e920b,2026-10-19 08:01 ET,,RTX,,WATCH,MEDIUM,pre-market,193.92,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_f5b292b93ef40c9e,361dd7c33ac6e510,2026-10-19 08:01 ET,,XOM,,HOLD,MEDIUM,pre-market,178.98,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_bbd3773480121470,0952b9342379a23b,2026-10-19 16:16 ET,2026-10-20,RTX,BUY,BUY,MEDIUM,post-market,192.11,2016.34,pending,,,,eligible recommendation,v2-aggressive
+ord_68f86463df85a620,080e3a0d07bd29e9,2026-10-19 16:16 ET,,NOC,,WATCH,MEDIUM,post-market,510.65,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_26a4bb5284b9d047,de4572f15bf99fce,2026-10-19 16:16 ET,,META,,WATCH,MEDIUM,post-market,705.44,0.00,ignored,,,,WATCH does not transact,v2-aggressive

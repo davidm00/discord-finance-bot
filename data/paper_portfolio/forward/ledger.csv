@@ -1,2 +1,3 @@
 event_id,occurred_at_et,event_type,order_id,signal_id,ticker,shares,price,cash_delta,reason,policy_version
 evt_dbd7c3338d0c75eb,2026-10-12 09:30 ET,BUY,ord_eea0554951fd3ea8,f3d175f13be1eca1,XOM,11.689378,171.0955,-2000.0000,next eligible open with adverse slippage,v2-aggressive
+evt_e979f1583e5e8c12,2026-10-19 09:30 ET,BUY,ord_07bb3dd718710939,8755c4d5a54a4f3f,NOC,3.947986,511.2555,-2018.4296,next eligible open with adverse slippage,v2-aggressive
