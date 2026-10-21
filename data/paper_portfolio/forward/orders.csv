@@ -46,3 +46,6 @@ ord_8764911c4afe9bf9,3eab86595e0b09c7,2026-10-20 16:16 ET,,UAL,,SELL,MEDIUM,post
 ord_e8571300aded93f9,86194906f2976c3b,2026-10-21 08:01 ET,,META,,WATCH,MEDIUM,pre-market,694.25,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_af6e25e00d27cb42,5d84d13f728f0f13,2026-10-21 08:01 ET,,SLB,,BUY,MEDIUM,pre-market,49.98,0.00,rejected,,,,maximum gross exposure reached,v2-aggressive
 ord_5cefabd9b9ddf78c,aaff67c70fff74e4,2026-10-21 08:01 ET,,LMT,,WATCH,LOW,pre-market,548.71,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_27efa65992b3450b,d572fbcda3cbab36,2026-10-21 16:16 ET,,LMT,,WATCH,MEDIUM,post-market,551.51,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_cc041e179d0f9e6a,736f4b36948176d7,2026-10-21 16:16 ET,,META,,HOLD,MEDIUM,post-market,697.52,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_9cb49e09f9ac0668,b2f16d1510af6bcf,2026-10-21 16:16 ET,,SLB,,WATCH,MEDIUM,post-market,51.10,0.00,ignored,,,,WATCH does not transact,v2-aggressive
