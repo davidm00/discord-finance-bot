@@ -2,3 +2,4 @@ event_id,occurred_at_et,event_type,order_id,signal_id,ticker,shares,price,cash_d
 evt_dbd7c3338d0c75eb,2026-10-12 09:30 ET,BUY,ord_eea0554951fd3ea8,f3d175f13be1eca1,XOM,11.689378,171.0955,-2000.0000,next eligible open with adverse slippage,v2-aggressive
 evt_e979f1583e5e8c12,2026-10-19 09:30 ET,BUY,ord_07bb3dd718710939,8755c4d5a54a4f3f,NOC,3.947986,511.2555,-2018.4296,next eligible open with adverse slippage,v2-aggressive
 evt_94beeaa235a33a3b,2026-10-20 09:30 ET,BUY,ord_bbd3773480121470,0952b9342379a23b,RTX,10.427009,193.3766,-2016.3400,next eligible open with adverse slippage,v2-aggressive
+evt_f63144f830338e0b,2026-10-23 16:00 ET,TIME_EXIT,risk_cff30aec85c8d57a,f3d175f13be1eca1,XOM,11.689378,183.1084,2140.4233,10-session safety exit,v2-aggressive

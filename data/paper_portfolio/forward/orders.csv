@@ -56,3 +56,6 @@ ord_03d559251450e24d,24ad031f8e97236f,2026-10-22 16:16 ET,,BAH,,WATCH,LOW,post-m
 ord_6b5608122175968f,ec615e0335d6f036,2026-10-23 08:01 ET,,SLB,,BUY,MEDIUM,pre-market,49.55,0.00,rejected,,,,maximum gross exposure reached,v2-aggressive
 ord_4f3c9dc6b60cd955,a1655f35aae6edeb,2026-10-23 08:01 ET,,BAH,,WATCH,LOW,pre-market,78.57,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_cef59dfc37a5d8ec,2136d6ac738a0a3d,2026-10-23 08:01 ET,,XOM,,WATCH,LOW,pre-market,178.23,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_cb524c597d917ef3,1f2fee76589add81,2026-10-23 16:16 ET,,SLB,,WATCH,LOW,post-market,53.06,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_465324e0e82e3cf1,bf32d10d90226207,2026-10-23 16:16 ET,,BAH,,WATCH,LOW,post-market,78.32,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_689a11662a78f16e,c5e238e060e9f3fc,2026-10-23 16:16 ET,2026-10-26,XOM,BUY,BUY,MEDIUM,post-market,183.20,2054.88,pending,,,,eligible recommendation,v2-aggressive
