@@ -62,3 +62,6 @@ ord_689a11662a78f16e,c5e238e060e9f3fc,2026-10-23 16:16 ET,2026-10-26,XOM,BUY,BUY
 ord_5210986a54f7fcff,742489ce184732fe,2026-10-24 08:01 ET,,XOM,,BUY,MEDIUM,weekly,183.21,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_e2f7181b31533d5e,195366c24ed0fdb2,2026-10-24 08:01 ET,,QQQ,,WATCH,LOW,weekly,704.40,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_902f163707b29ae5,3bfba057fda34b35,2026-10-24 08:01 ET,,SLB,,WATCH,LOW,weekly,53.06,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_83ae05d05ac5f32a,a285adc548a7e498,2026-10-26 08:01 ET,,XOM,,BUY,MEDIUM,pre-market,183.21,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_fd11bc80f8477b8b,9411807cc15d251b,2026-10-26 08:01 ET,,MSFT,,WATCH,MEDIUM,pre-market,524.51,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_6983aaf9e978132c,88c1d378945252e3,2026-10-26 08:01 ET,,GOOGL,,WATCH,LOW,pre-market,320.21,0.00,ignored,,,,WATCH does not transact,v2-aggressive
