@@ -71,3 +71,6 @@ ord_95ac29a36ef4845b,bf277c7ff447cc28,2026-10-26 16:16 ET,,FTNT,,WATCH,LOW,post-
 ord_27ae05bddb0ae6a9,3a90d19d896d3a32,2026-10-27 08:01 ET,,MSFT,,WATCH,MEDIUM,pre-market,532.60,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_21b5553a6b4b5859,16f4d9e1d7634fa6,2026-10-27 08:01 ET,,GOOGL,,WATCH,MEDIUM,pre-market,316.80,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_4b13d57c87b1fa5d,d89db62cd7004b6d,2026-10-27 08:01 ET,,XOM,,BUY,MEDIUM,pre-market,184.54,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_7d1fa6bfad8f5181,80d1341453a178bd,2026-10-27 16:16 ET,,MSFT,,WATCH,MEDIUM,post-market,531.33,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_2f4c3602848b6aae,f8762dbd14e91e43,2026-10-27 16:16 ET,,GOOGL,,WATCH,MEDIUM,post-market,320.58,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_3f70390f97fb4e08,782e1c62c56497d4,2026-10-27 16:16 ET,,XOM,,BUY,MEDIUM,post-market,179.88,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
