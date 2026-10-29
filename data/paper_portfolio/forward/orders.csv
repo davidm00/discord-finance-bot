@@ -80,3 +80,6 @@ ord_1ff9f659c385546e,5a214ad39ffbe109,2026-10-28 08:01 ET,,XOM,,BUY,MEDIUM,pre-m
 ord_4caffb1f4276e831,822b7484620b2f09,2026-10-28 16:16 ET,,MSFT,,WATCH,MEDIUM,post-market,531.01,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_338666f62dc335f9,b1ea9008e7c07c77,2026-10-28 16:16 ET,,GOOGL,,WATCH,MEDIUM,post-market,324.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_21605073fefa1ce0,f1815c26bbe4d444,2026-10-28 16:16 ET,,XOM,,BUY,MEDIUM,post-market,182.06,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_f5d0e13efdb10217,d0cc5cde740a89fd,2026-10-29 08:01 ET,,AMZN,,WATCH,MEDIUM,pre-market,254.60,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_c6c174a0206456ac,885c6a3f59649e6f,2026-10-29 08:01 ET,,XOM,,BUY,MEDIUM,pre-market,182.02,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_9485b47b554c0dde,168551bf4b4e677c,2026-10-29 08:01 ET,,HII,,BUY,MEDIUM,pre-market,279.26,0.00,rejected,,,,maximum gross exposure reached,v2-aggressive
