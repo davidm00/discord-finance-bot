@@ -86,3 +86,6 @@ ord_9485b47b554c0dde,168551bf4b4e677c,2026-10-29 08:01 ET,,HII,,BUY,MEDIUM,pre-m
 ord_e34da3fd036a728e,a00ce5aa98b74282,2026-10-29 16:16 ET,,AMZN,,WATCH,MEDIUM,post-market,243.79,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_de1f1e5fba0b322c,f6bb0975a584493f,2026-10-29 16:16 ET,,XOM,,BUY,MEDIUM,post-market,183.29,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_098ef07ab52c0a69,4ef8ef4bd26c2121,2026-10-29 16:16 ET,,CVX,,BUY,MEDIUM,post-market,231.43,0.00,rejected,,,,maximum gross exposure reached,v2-aggressive
+ord_87a991788c3e8d3f,0d19317bfdfa8117,2026-10-30 08:01 ET,,XOM,,HOLD,MEDIUM,pre-market,183.29,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_7fd5671c5cac958c,94c9e445ce63c973,2026-10-30 08:01 ET,,CVX,,HOLD,MEDIUM,pre-market,231.46,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_0c23fdcea63a2151,51e70989f8105279,2026-10-30 08:01 ET,,AMZN,,SELL,MEDIUM,pre-market,243.79,0.00,ignored,,,,SELL has no held long position,v2-aggressive
