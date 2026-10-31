@@ -92,3 +92,8 @@ ord_0c23fdcea63a2151,51e70989f8105279,2026-10-30 08:01 ET,,AMZN,,SELL,MEDIUM,pre
 ord_2320202c40ea298e,d64f0c1c13c9d25a,2026-10-30 16:16 ET,,XOM,,BUY,MEDIUM,post-market,187.24,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_5b1f12a644a2c1be,b170be25e3963054,2026-10-30 16:16 ET,,PLTR,,WATCH,MEDIUM,post-market,184.11,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_1ebc753fb04f41e1,35996d89a2f484c9,2026-10-30 16:16 ET,,AAPL,,WATCH,MEDIUM,post-market,345.34,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_8c37a12747c1ef43,8417bc9b69ba80b5,2026-10-31 08:02 ET,,XOM,,BUY,MEDIUM,weekly,187.25,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_fd7001ba83d1a499,a5249904ead83113,2026-10-31 08:02 ET,,AAPL,,WATCH,MEDIUM,weekly,344.63,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_574893be1c653198,31b461fa844443a9,2026-10-31 08:02 ET,,PLTR,,WATCH,MEDIUM,weekly,184.11,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_60a056f11b3282e7,80cb3d2e284ec829,2026-10-31 08:02 ET,,QQQ,,WATCH,LOW,weekly,690.49,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_ab52c7df8eab7095,8d62845b2973e1b8,2026-10-31 08:02 ET,,CVX,,HOLD,MEDIUM,weekly,235.52,0.00,ignored,,,,HOLD does not transact,v2-aggressive
