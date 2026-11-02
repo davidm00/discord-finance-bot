@@ -97,3 +97,6 @@ ord_fd7001ba83d1a499,a5249904ead83113,2026-10-31 08:02 ET,,AAPL,,WATCH,MEDIUM,we
 ord_574893be1c653198,31b461fa844443a9,2026-10-31 08:02 ET,,PLTR,,WATCH,MEDIUM,weekly,184.11,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_60a056f11b3282e7,80cb3d2e284ec829,2026-10-31 08:02 ET,,QQQ,,WATCH,LOW,weekly,690.49,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_ab52c7df8eab7095,8d62845b2973e1b8,2026-10-31 08:02 ET,,CVX,,HOLD,MEDIUM,weekly,235.52,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_b0da91c0987186d7,4f737893dfaeeba6,2026-11-02 08:01 ET,,AAPL,,WATCH,MEDIUM,pre-market,344.63,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_5621700c8d85c948,808c5ae57a60a501,2026-11-02 08:01 ET,2026-11-02,COP,BUY,BUY,MEDIUM,pre-market,154.03,2090.69,pending,,,,eligible recommendation,v2-aggressive
+ord_39d668421c78c893,ee97178143bdd174,2026-11-02 08:01 ET,,LDOS,,WATCH,LOW,pre-market,142.98,0.00,ignored,,,,WATCH does not transact,v2-aggressive
