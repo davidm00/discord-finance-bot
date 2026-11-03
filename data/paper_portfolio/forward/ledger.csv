@@ -7,3 +7,5 @@ evt_94e5be1dd1920634,2026-10-26 09:30 ET,BUY,ord_689a11662a78f16e,c5e238e060e9f3
 evt_4afe5830ebb3d26c,2026-10-30 16:00 ET,TIME_EXIT,risk_b786873f05165131,8755c4d5a54a4f3f,NOC,3.947986,558.4207,2204.6370,10-session safety exit,v2-aggressive
 evt_d51e3f46a5093524,2026-11-02 09:30 ET,BUY,ord_5621700c8d85c948,808c5ae57a60a501,COP,13.769860,151.8309,-2090.6900,next eligible open with adverse slippage,v2-aggressive
 evt_baf5fde5a49a8384,2026-11-02 16:00 ET,TIME_EXIT,risk_ebbe29ef9a2517c3,0952b9342379a23b,RTX,10.427009,202.6886,2113.4358,10-session safety exit,v2-aggressive
+evt_1d9424e583fe149e,2026-11-03 09:30 ET,BUY,ord_80be50b5be0f4cca,59bc0972fbbb2aac,MPC,4.801901,430.2150,-2065.8498,next eligible open with adverse slippage,v2-aggressive
+evt_491d6a825383effd,2026-11-03 16:00 ET,STOP,risk_f5a46d83eb4fdec8,808c5ae57a60a501,COP,13.769860,145.1074,1998.1086,opened below stop threshold,v2-aggressive
