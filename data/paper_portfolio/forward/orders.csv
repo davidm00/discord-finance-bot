@@ -103,3 +103,6 @@ ord_39d668421c78c893,ee97178143bdd174,2026-11-02 08:01 ET,,LDOS,,WATCH,LOW,pre-m
 ord_ca25dd7c1519f6b8,aa79b71a9ffb7f13,2026-11-02 16:16 ET,,AAPL,,WATCH,MEDIUM,post-market,338.32,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_4135842af8cfc6c8,3ba18dac6f3e1ff8,2026-11-02 16:16 ET,,COP,,BUY,MEDIUM,post-market,146.84,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
 ord_1e26c637d835c7fd,b448f162950e8580,2026-11-02 16:16 ET,,LDOS,,WATCH,MEDIUM,post-market,144.17,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_80be50b5be0f4cca,59bc0972fbbb2aac,2026-11-03 08:01 ET,2026-11-03,MPC,BUY,BUY,MEDIUM,pre-market,430.39,2065.85,pending,,,,eligible recommendation,v2-aggressive
+ord_08213456405901ad,70b71aa667ceb6cb,2026-11-03 08:01 ET,,AMD,,WATCH,MEDIUM,pre-market,466.84,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_450fa99203c654c3,05d5b9cbcc19e5c3,2026-11-03 08:01 ET,,LDOS,,WATCH,LOW,pre-market,144.16,0.00,ignored,,,,WATCH does not transact,v2-aggressive
