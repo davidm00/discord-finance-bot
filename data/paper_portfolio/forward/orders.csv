@@ -109,3 +109,6 @@ ord_450fa99203c654c3,05d5b9cbcc19e5c3,2026-11-03 08:01 ET,,LDOS,,WATCH,LOW,pre-m
 ord_163c1235128ef92d,a731bbe68635fff6,2026-11-03 16:16 ET,,AMD,,WATCH,MEDIUM,post-market,483.90,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_da2acdf5ab3af021,3de867335838f4d4,2026-11-03 16:16 ET,,LDOS,,WATCH,LOW,post-market,134.72,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_2532f18b0eeb7328,9648b7dcda6d5c07,2026-11-03 16:16 ET,,COP,,BUY,MEDIUM,post-market,144.40,0.00,ignored,,,,repeat BUY inside policy window,v2-aggressive
+ord_90dc952127f4ac1b,e2456a3dbd439fa2,2026-11-04 08:01 ET,,MCD,,WATCH,MEDIUM,pre-market,263.04,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_78544db6ff5104b2,d51bc08517c4aca1,2026-11-04 08:01 ET,,QCOM,,WATCH,MEDIUM,pre-market,164.43,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_caa7f0c21e8537a8,803f957e57ef944f,2026-11-04 08:01 ET,,COP,,BUY,MEDIUM,pre-market,144.40,0.00,ignored,,,,repeat BUY inside policy window,v2-aggressive
