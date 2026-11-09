@@ -133,3 +133,6 @@ ord_3b9a7cf12d066e8b,7c6c050784f33fa8,2026-11-07 08:01 ET,,MRNA,,WATCH,LOW,weekl
 ord_9d0646288c5cc2fb,0936735b91431661,2026-11-09 08:02 ET,,OXY,,WATCH,LOW,pre-market,56.38,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_4d84edb3bd3022b8,63a837e18e3aa858,2026-11-09 08:02 ET,,TDG,,WATCH,MEDIUM,pre-market,1197.01,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_0b5fd3d89882d012,0e1eb4934383aff6,2026-11-09 08:02 ET,,QQQ,,WATCH,MEDIUM,pre-market,656.10,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_7d657c29e2e16576,fc33de3b997ed773,2026-11-09 16:16 ET,,NVDA,,WATCH,LOW,post-market,178.67,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_f1ffda0d0489b935,e09804e7fba41568,2026-11-09 16:16 ET,,OXY,,WATCH,LOW,post-market,55.76,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_b725ebc08403748c,941671ea2074a5d9,2026-11-09 16:16 ET,,TDG,,WATCH,MEDIUM,post-market,1218.85,0.00,ignored,,,,WATCH does not transact,v2-aggressive
