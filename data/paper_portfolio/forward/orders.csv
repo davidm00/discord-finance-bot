@@ -139,3 +139,6 @@ ord_b725ebc08403748c,941671ea2074a5d9,2026-11-09 16:16 ET,,TDG,,WATCH,MEDIUM,pos
 ord_6670607196ad02ee,12905ce3bb9eecf9,2026-11-10 08:01 ET,,TDG,,WATCH,MEDIUM,pre-market,1218.85,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_8005c2c11c001fdc,3f0c189b5ae4ffb5,2026-11-10 08:01 ET,,QQQ,,WATCH,MEDIUM,pre-market,679.35,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_c25b10156037bee6,de4fecc92cdfe2a7,2026-11-10 08:01 ET,,XOM,,SELL,LOW,pre-market,164.73,0.00,rejected,,,,confidence below execution threshold,v2-aggressive
+ord_9966c4eff8c854cc,d41b3264a4e0236b,2026-11-10 16:16 ET,,NVDA,,WATCH,MEDIUM,post-market,168.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_208937996bbfdc0b,c6ac34d4e18badc6,2026-11-10 16:16 ET,,QQQ,,SELL,MEDIUM,post-market,674.76,0.00,ignored,,,,SELL has no held long position,v2-aggressive
+ord_abb39b9c455ccf43,8fd8d74d5cca9f1e,2026-11-10 16:16 ET,,TDG,,WATCH,LOW,post-market,1225.54,0.00,ignored,,,,WATCH does not transact,v2-aggressive
