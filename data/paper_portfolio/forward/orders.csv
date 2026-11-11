@@ -145,3 +145,6 @@ ord_abb39b9c455ccf43,8fd8d74d5cca9f1e,2026-11-10 16:16 ET,,TDG,,WATCH,LOW,post-m
 ord_ff88317c394ad4df,b8320884fecfa2bb,2026-11-11 08:01 ET,,XOM,,WATCH,LOW,pre-market,164.47,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_e3eb4d4ebdd5370e,111cc2c1cce2cffa,2026-11-11 08:01 ET,,QQQ,,WATCH,LOW,pre-market,674.76,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_63e3968e0b32e89c,244c2db9682799b0,2026-11-11 08:01 ET,,AMAT,,WATCH,MEDIUM,pre-market,372.53,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_f85a32806cea6916,9dc1ecb432691b6b,2026-11-11 16:16 ET,,AMAT,,WATCH,MEDIUM,post-market,395.08,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_8f3f97409028c9ac,5e3472143e45dd91,2026-11-11 16:16 ET,,QQQ,,HOLD,MEDIUM,post-market,690.38,0.00,ignored,,,,HOLD does not transact,v2-aggressive
+ord_d8a9dc695565e7f5,be9412d8f6e0dfd9,2026-11-11 16:16 ET,,XOM,,WATCH,LOW,post-market,166.71,0.00,ignored,,,,WATCH does not transact,v2-aggressive
