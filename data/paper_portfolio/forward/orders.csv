@@ -167,3 +167,6 @@ ord_8b33805cd05c70a2,70b840f2ce0de9e8,2026-11-14 08:01 ET,,AMD,,SELL,MEDIUM,week
 ord_3146a2438c2e1f05,da7f1b8ba02b47d5,2026-11-16 08:01 ET,,NVDA,,WATCH,MEDIUM,pre-market,162.85,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_925692e5c0bf013b,8f2d0aed1610f856,2026-11-16 08:01 ET,,QQQ,,WATCH,MEDIUM,pre-market,679.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_45b65b93d74b9d84,4bf7f1154fccece0,2026-11-16 08:01 ET,,PANW,,WATCH,LOW,pre-market,322.24,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_e28d0ca94dbce869,d5416bc6a66ee19c,2026-11-16 16:16 ET,,NVDA,,WATCH,LOW,post-market,156.14,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_fe5ca4752a53bb5e,ad60579b5dc69e73,2026-11-16 16:16 ET,,PANW,,WATCH,LOW,post-market,316.09,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_7ff58c128edc2119,e77eeaef7a744f4e,2026-11-16 16:16 ET,,DIS,,WATCH,LOW,post-market,118.73,0.00,ignored,,,,WATCH does not transact,v2-aggressive
