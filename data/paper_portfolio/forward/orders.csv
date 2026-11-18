@@ -176,6 +176,9 @@ ord_10d0e1ea0a9648bf,43ea8ee3b5a40bcb,2026-11-17 08:01 ET,,PANW,,WATCH,LOW,pre-m
 ord_a97e90db784b159d,9bc3076fdd9ea2d6,2026-11-17 16:16 ET,,NVDA,,WATCH,LOW,post-market,155.46,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_775ed1c18ac7dec8,f419bc9e1cff6ebd,2026-11-17 16:16 ET,,PANW,,WATCH,LOW,post-market,309.29,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_14daefa751db6c97,efa537ede200bfbb,2026-11-17 16:16 ET,,SOL,,WATCH,LOW,post-market,73.08,0.00,ignored,,,,WATCH does not transact,v2-aggressive
-ord_03b5acc55da8a644,22cc36f4eaed4fc6,2026-11-18 08:01 ET,2026-11-18,NVDA,BUY,BUY,MEDIUM,pre-market,155.46,2031.94,pending,,,,eligible recommendation,v2-aggressive
+ord_03b5acc55da8a644,22cc36f4eaed4fc6,2026-11-18 08:01 ET,2026-11-18,NVDA,BUY,BUY,MEDIUM,pre-market,155.46,2031.94,rejected,,,,opening gap 2.40% exceeded 2.00%,v2-aggressive
 ord_fc6ebb73d84110a3,4564e3e1dac89e2f,2026-11-18 08:01 ET,,PANW,,WATCH,MEDIUM,pre-market,309.29,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_3829055ec090b8e5,3f24e39b3c0165df,2026-11-18 08:01 ET,,TGT,,WATCH,LOW,pre-market,159.53,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_a73350cb7c5dc771,c44fc7bc59ce1376,2026-11-18 16:16 ET,,PANW,,WATCH,MEDIUM,post-market,339.92,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_37815bf0522db626,d48a52e2d7ea0e62,2026-11-18 16:16 ET,,WMT,,WATCH,MEDIUM,post-market,127.36,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_b9a721a367cc427a,82f60a546362c575,2026-11-18 16:16 ET,,QQQ,,WATCH,LOW,post-market,659.51,0.00,ignored,,,,WATCH does not transact,v2-aggressive
