@@ -191,3 +191,6 @@ ord_3c9785aa65c2a29c,ad85d28c5d7dcc25,2026-11-19 16:16 ET,,BTC,,SELL,MEDIUM,post
 ord_1f6d8ded309b2509,87a1aee225083bab,2026-11-20 08:01 ET,,QQQ,,SELL,MEDIUM,pre-market,645.04,0.00,ignored,,,,SELL has no held long position,v2-aggressive
 ord_72ebebe1a1ab8d39,258b01006779ef88,2026-11-20 08:01 ET,,NVDA,,SELL,MEDIUM,pre-market,145.98,0.00,ignored,,,,SELL has no held long position,v2-aggressive
 ord_5a482ba1e013ea66,d2d3666b17ce3d29,2026-11-20 08:01 ET,,BTC,,SELL,MEDIUM,pre-market,61515.42,0.00,rejected,,,,asset excluded from v1,v2-aggressive
+ord_e0d3542b2b64e5b9,4ef90fe025487b3e,2026-11-20 16:16 ET,,CRWD,,WATCH,LOW,post-market,229.44,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_76d29ed24b6f9657,cbce850fa43093ef,2026-11-20 16:16 ET,,ZS,,WATCH,LOW,post-market,194.82,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_314b7773e10ebbf2,b7bf0ef8f7178d62,2026-11-20 16:16 ET,,QQQ,,SELL,MEDIUM,post-market,608.45,0.00,ignored,,,,SELL has no held long position,v2-aggressive
