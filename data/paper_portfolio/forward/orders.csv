@@ -194,3 +194,8 @@ ord_5a482ba1e013ea66,d2d3666b17ce3d29,2026-11-20 08:01 ET,,BTC,,SELL,MEDIUM,pre-
 ord_e0d3542b2b64e5b9,4ef90fe025487b3e,2026-11-20 16:16 ET,,CRWD,,WATCH,LOW,post-market,229.44,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_76d29ed24b6f9657,cbce850fa43093ef,2026-11-20 16:16 ET,,ZS,,WATCH,LOW,post-market,194.82,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_314b7773e10ebbf2,b7bf0ef8f7178d62,2026-11-20 16:16 ET,,QQQ,,SELL,MEDIUM,post-market,608.45,0.00,ignored,,,,SELL has no held long position,v2-aggressive
+ord_7fc396431a7cbe55,9051f67dbbf6b48e,2026-11-21 08:01 ET,,QQQ,,WATCH,MEDIUM,weekly,608.45,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_d1c85f625ec73952,902bea6e214e01f1,2026-11-21 08:01 ET,,NVDA,,SELL,MEDIUM,weekly,125.53,0.00,ignored,,,,SELL has no held long position,v2-aggressive
+ord_e5a51b3043a9930a,e1f2a2d2b0463156,2026-11-21 08:01 ET,,BTC,,SELL,MEDIUM,weekly,58781.98,0.00,rejected,,,,asset excluded from v1,v2-aggressive
+ord_4309bf3addc63e08,d0155935a1235395,2026-11-21 08:01 ET,,XOM,,WATCH,LOW,weekly,159.99,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_72f04098d757d24b,b6766d515247a243,2026-11-21 08:01 ET,,CRWD,,WATCH,LOW,weekly,229.44,0.00,ignored,,,,WATCH does not transact,v2-aggressive
