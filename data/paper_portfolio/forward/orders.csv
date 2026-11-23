@@ -199,3 +199,5 @@ ord_d1c85f625ec73952,902bea6e214e01f1,2026-11-21 08:01 ET,,NVDA,,SELL,MEDIUM,wee
 ord_e5a51b3043a9930a,e1f2a2d2b0463156,2026-11-21 08:01 ET,,BTC,,SELL,MEDIUM,weekly,58781.98,0.00,rejected,,,,asset excluded from v1,v2-aggressive
 ord_4309bf3addc63e08,d0155935a1235395,2026-11-21 08:01 ET,,XOM,,WATCH,LOW,weekly,159.99,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_72f04098d757d24b,b6766d515247a243,2026-11-21 08:01 ET,,CRWD,,WATCH,LOW,weekly,229.44,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_0c16fe4ac926e1fb,07e80ae3230c1495,2026-11-23 08:01 ET,,ZM,,WATCH,MEDIUM,pre-market,81.26,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_2d3c8d9cb93685c1,f0201c82577e8ead,2026-11-23 08:01 ET,,XOM,,WATCH,LOW,pre-market,159.99,0.00,ignored,,,,WATCH does not transact,v2-aggressive
