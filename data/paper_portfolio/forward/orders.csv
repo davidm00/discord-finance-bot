@@ -204,3 +204,6 @@ ord_2d3c8d9cb93685c1,f0201c82577e8ead,2026-11-23 08:01 ET,,XOM,,WATCH,LOW,pre-ma
 ord_b7f25b73bb52bcc2,30590a8cdca16212,2026-11-23 16:16 ET,,NVDA,,WATCH,MEDIUM,post-market,165.05,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_4692eb3b0286b7b0,58fe355c86886375,2026-11-23 16:16 ET,,ZM,,WATCH,MEDIUM,post-market,86.03,0.00,ignored,,,,WATCH does not transact,v2-aggressive
 ord_05828fb2efc1cc82,1ace5edb9f4b7f59,2026-11-23 16:16 ET,,DELL,,WATCH,MEDIUM,post-market,335.89,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_a0137327c0ce225f,67fd4d9ec69f80b5,2026-11-24 08:01 ET,,DELL,,WATCH,MEDIUM,pre-market,334.91,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_36a38b1907052454,c7fbe32484b71c9b,2026-11-24 08:01 ET,,ADI,,WATCH,MEDIUM,pre-market,378.75,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_c650db049d7c0343,941d960df8689cfc,2026-11-24 08:01 ET,,XOM,,SELL,MEDIUM,pre-market,156.90,0.00,ignored,,,,SELL has no held long position,v2-aggressive
