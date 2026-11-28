@@ -222,3 +222,8 @@ ord_b269dbcd53b4f43a,9a37e332b446bdf8,2026-11-27 08:01 ET,,SOL,,WATCH,LOW,pre-ma
 ord_4be306b0d6db2610,c69a12c437d29dfa,2026-11-27 16:16 ET,2026-11-30,CRWD,BUY,BUY,MEDIUM,post-market,217.20,2031.94,pending,,,,eligible recommendation,v2-aggressive
 ord_8ced77500fa22509,e6840c761495d0b6,2026-11-27 16:16 ET,,QQQ,,HOLD,MEDIUM,post-market,650.99,0.00,ignored,,,,HOLD does not transact,v2-aggressive
 ord_576d8d28b0fddf55,645fae33b04ed44f,2026-11-27 16:16 ET,,BTC,,SELL,MEDIUM,post-market,59790.95,0.00,rejected,,,,asset excluded from v1,v2-aggressive
+ord_77451bb94336d4ae,4458ec81d2bb6b46,2026-11-28 08:01 ET,,CRWD,,BUY,MEDIUM,weekly,217.20,0.00,ignored,,,,position or BUY order already exists,v2-aggressive
+ord_566145ccded3a8bc,389196e5dabe0a85,2026-11-28 08:01 ET,,QQQ,,WATCH,MEDIUM,weekly,650.99,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_1c323129f34b06ab,9ea492902e8f8240,2026-11-28 08:01 ET,,BTC,,SELL,MEDIUM,weekly,59180.86,0.00,rejected,,,,asset excluded from v1,v2-aggressive
+ord_18fd5af930a6a5bd,66b3426f04bfa553,2026-11-28 08:01 ET,,XOM,,WATCH,LOW,weekly,160.18,0.00,ignored,,,,WATCH does not transact,v2-aggressive
+ord_8c536033b4745f0a,3fb6317f7ada39ab,2026-11-28 08:01 ET,,PANW,,WATCH,LOW,weekly,366.76,0.00,ignored,,,,WATCH does not transact,v2-aggressive
